@@ -347,8 +347,8 @@ class M3U8StreamingPlayer:
                 os.makedirs("downloads")
             
             filename = f"stream_{datetime.now().strftime('%Y%m%d_%H%M%S')}.ts"
-            filepath = os.path.join("downloads", filename)
-            filepath = get_unique_filename("downloads", filename)
+            unique_filename = get_unique_filename("downloads", filename)
+            filepath = os.path.join("downloads", unique_filename)
             
             self.player.start_recording(filepath)
             self.is_recording = True
