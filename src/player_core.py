@@ -1,7 +1,22 @@
 import os
 import sys
-import mpv
 from .config import MPV_PATHS
+
+# -------------------------------------------------
+#  Setup PATH for libmpv before importing mpv
+# -------------------------------------------------
+dll_found = False
+for p in MPV_PATHS:
+    dll = os.path.join(p, "libmpv-2.dll")
+    if os.path.exists(dll):
+        os.environ["PATH"] = p + os.pathsep + os.environ.get("PATH", "")
+        dll_found = True
+        break
+
+if not dll_found:
+    print("Warning: libmpv-2.dll not found in expected paths. 'import mpv' might fail.")
+
+import mpv
 
 class MpvPlayer:
     def __init__(self, wid=None):
@@ -10,18 +25,6 @@ class MpvPlayer:
         self._init_mpv()
         
     def _init_mpv(self):
-        # Add paths to environment
-        dll_found = False
-        for p in MPV_PATHS:
-            dll = os.path.join(p, "libmpv-2.dll")
-            if os.path.exists(dll):
-                os.environ["PATH"] = p + os.pathsep + os.environ.get("PATH", "")
-                dll_found = True
-                break
-        
-        if not dll_found:
-            raise FileNotFoundError("libmpv-2.dll not found in any of the expected paths.")
-
         try:
             self.mpv = mpv.MPV(
                 wid=str(self.wid) if self.wid else None,

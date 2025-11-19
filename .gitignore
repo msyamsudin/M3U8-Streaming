@@ -25,3 +25,7 @@ history.json
 libmpv-2.dll
 mpv-1.dll
 mpv/
+
+# Documentation Artifacts
+implementation_plan.md
+walkthrough.md

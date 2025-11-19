@@ -58,4 +58,4 @@ python main.py
 
 ## Lisensi
 
-MIT
+Open Source
