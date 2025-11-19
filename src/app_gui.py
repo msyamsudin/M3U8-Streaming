@@ -436,12 +436,14 @@ class M3U8StreamingPlayer:
         self.is_fullscreen = True
 
     def exit_fullscreen(self):
+        # 1. Move player back to main window FIRST
+        if self.player:
+            self.player.set_wid(self.video_canvas.winfo_id())
+
+        # 2. Then destroy fullscreen window
         if self.fullscreen_window:
             self.fullscreen_window.destroy()
             self.fullscreen_window = None
-            
-        if self.player:
-            self.player.set_wid(self.video_canvas.winfo_id())
             
         self.is_fullscreen = False
 
