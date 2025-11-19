@@ -1,0 +1,454 @@
+import tkinter as tk
+from tkinter import ttk, messagebox, Menu, filedialog
+import threading
+import os
+import requests
+from datetime import datetime
+
+from .config import COLORS, USER_AGENTS
+from .player_core import MpvPlayer
+from .ui_components import StyledButton, HistoryPanel
+from .utils import format_time, load_history, save_history, get_unique_filename
+
+class M3U8StreamingPlayer:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("M3U8 Player")
+        self.root.geometry("1000x600")
+        self.root.configure(bg=COLORS['bg'])
+        
+        # State
+        self.player = None
+        self.is_playing = False
+        self.is_seeking = False
+        self.is_fullscreen = False
+        self.is_recording = False
+        self.show_config = True
+        self.show_history = False
+        self.current_url = ""
+        self.previous_volume = 100
+        
+        # Fullscreen state
+        self.normal_geometry = None
+        self.fullscreen_window = None
+        self.fullscreen_video_frame = None
+
+        # Initialize UI
+        self.setup_menu()
+        self.setup_ui()
+        self.setup_styles()
+        self.setup_bindings()
+        
+        # Initialize Player
+        try:
+            self.player = MpvPlayer(wid=self.video_canvas.winfo_id())
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+            
+        # Start periodic updates
+        self.update_player_info()
+        
+        # Load History
+        self.refresh_history()
+
+    def setup_styles(self):
+        style = ttk.Style()
+        style.theme_use('winnative')
+        style.configure('MPC.Horizontal.TScale',
+                       background=COLORS['toolbar_bg'],
+                       troughcolor=COLORS['seekbar_bg'],
+                       borderwidth=0)
+
+    def setup_bindings(self):
+        self.root.bind("<f>", lambda e: self.toggle_fullscreen())
+        self.root.bind("<F>", lambda e: self.toggle_fullscreen())
+        self.root.bind("<Escape>", lambda e: self.exit_fullscreen())
+        self.root.bind("<Right>", lambda e: self.skip(10))
+        self.root.bind("<Left>", lambda e: self.skip(-10))
+        self.root.bind("<space>", lambda e: self.toggle_play_pause())
+        self.root.bind("<Control-o>", lambda e: self.show_open_dialog())
+        self.root.bind("<Control-O>", lambda e: self.show_open_dialog())
+        self.root.bind("<Configure>", self.on_window_resize)
+
+    def setup_menu(self):
+        menubar = Menu(self.root, bg=COLORS['menu_bg'], fg=COLORS['text'], 
+                      activebackground=COLORS['button_hover'], activeforeground=COLORS['text'],
+                      borderwidth=0, relief=tk.FLAT)
+        
+        # File menu
+        file_menu = Menu(menubar, tearoff=0, bg=COLORS['menu_bg'], fg=COLORS['text'])
+        file_menu.add_command(label="Open URL... (Ctrl+O)", command=self.show_open_dialog)
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self.on_closing)
+        menubar.add_cascade(label="File", menu=file_menu)
+        
+        # View menu
+        view_menu = Menu(menubar, tearoff=0, bg=COLORS['menu_bg'], fg=COLORS['text'])
+        view_menu.add_command(label="Fullscreen (F)", command=self.toggle_fullscreen)
+        view_menu.add_checkbutton(label="Show History", command=self.toggle_history)
+        self.always_on_top_var = tk.BooleanVar(value=False)
+        view_menu.add_checkbutton(label="Always on Top", variable=self.always_on_top_var, command=self.toggle_always_on_top)
+        menubar.add_cascade(label="View", menu=view_menu)
+        
+        self.root.config(menu=menubar)
+
+    def setup_ui(self):
+        # Main container (Horizontal for History Panel)
+        self.main_container = tk.Frame(self.root, bg=COLORS['bg'])
+        self.main_container.pack(fill=tk.BOTH, expand=True)
+
+        # Left side (Player)
+        self.player_area = tk.Frame(self.main_container, bg=COLORS['bg'])
+        self.player_area.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Toolbar
+        toolbar = tk.Frame(self.player_area, bg=COLORS['toolbar_bg'], relief=tk.RAISED, bd=1)
+        toolbar.pack(fill=tk.X, side=tk.TOP)
+        
+        StyledButton(toolbar, text="Open", command=self.show_open_dialog).pack(side=tk.LEFT, padx=1, pady=4)
+        StyledButton(toolbar, text="▶", command=self.toggle_play_pause, width=3).pack(side=tk.LEFT, padx=1, pady=4)
+        StyledButton(toolbar, text="■", command=self.stop_stream, width=3).pack(side=tk.LEFT, padx=1, pady=4)
+        
+        tk.Frame(toolbar, bg=COLORS['border'], width=1).pack(side=tk.LEFT, fill=tk.Y, padx=4, pady=6)
+        
+        self.record_btn = StyledButton(toolbar, text="● Record", command=self.toggle_recording)
+        self.record_btn.pack(side=tk.LEFT, padx=1, pady=4)
+        
+        tk.Frame(toolbar, bg=COLORS['border'], width=1).pack(side=tk.LEFT, fill=tk.Y, padx=4, pady=6)
+        
+        StyledButton(toolbar, text="⛶ Fullscreen", command=self.toggle_fullscreen).pack(side=tk.LEFT, padx=1, pady=4)
+
+        # Config Panel
+        self.setup_config_panel()
+
+        # Video Area
+        self.video_frame = tk.Frame(self.player_area, bg=COLORS['video_bg'], relief=tk.SUNKEN, bd=2)
+        self.video_frame.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+        
+        self.video_canvas = tk.Frame(self.video_frame, bg=COLORS['video_bg'])
+        self.video_canvas.pack(fill=tk.BOTH, expand=True)
+        
+        # Control Panel
+        self.setup_control_panel()
+
+        # Right side (History) - Initially hidden
+        self.history_panel = HistoryPanel(self.main_container, self.load_from_history, width=250)
+
+    def setup_config_panel(self):
+        self.config_panel = tk.Frame(self.player_area, bg=COLORS['bg'], relief=tk.GROOVE, bd=2)
+        self.config_panel.pack(fill=tk.X, padx=4, pady=4)
+        
+        inner = tk.Frame(self.config_panel, bg=COLORS['bg'])
+        inner.pack(fill=tk.BOTH, padx=10, pady=10)
+        
+        # Grid layout
+        tk.Label(inner, text="Stream URL:", bg=COLORS['bg'], fg=COLORS['text'], font=('Segoe UI', 9, 'bold')).grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.url_entry = tk.Entry(inner, font=('Segoe UI', 9), bg=COLORS['entry_bg'], fg=COLORS['entry_fg'], insertbackground=COLORS['text'])
+        self.url_entry.grid(row=0, column=1, sticky=tk.EW, padx=5, pady=5)
+        
+        tk.Label(inner, text="Referer:", bg=COLORS['bg'], fg=COLORS['text'], font=('Segoe UI', 9, 'bold')).grid(row=1, column=0, sticky=tk.W, pady=5)
+        self.referer_entry = tk.Entry(inner, font=('Segoe UI', 9), bg=COLORS['entry_bg'], fg=COLORS['entry_fg'], insertbackground=COLORS['text'])
+        self.referer_entry.insert(0, "https://www.patreon.com")
+        self.referer_entry.grid(row=1, column=1, sticky=tk.EW, padx=5, pady=5)
+        
+        tk.Label(inner, text="User Agent:", bg=COLORS['bg'], fg=COLORS['text'], font=('Segoe UI', 9, 'bold')).grid(row=2, column=0, sticky=tk.W, pady=5)
+        self.ua_var = tk.StringVar(value="Chrome")
+        ttk.Combobox(inner, textvariable=self.ua_var, values=list(USER_AGENTS.keys()), state="readonly").grid(row=2, column=1, sticky=tk.W, padx=5, pady=5)
+        
+        StyledButton(inner, text="Load Stream", command=self.load_and_play_stream).grid(row=3, column=1, sticky=tk.E, padx=5, pady=10)
+        
+        inner.columnconfigure(1, weight=1)
+
+    def setup_control_panel(self):
+        panel = tk.Frame(self.player_area, bg=COLORS['control_bg'], relief=tk.RAISED, bd=1)
+        panel.pack(fill=tk.X, side=tk.BOTTOM)
+        
+        # Seekbar
+        seek_frame = tk.Frame(panel, bg=COLORS['control_bg'])
+        seek_frame.pack(fill=tk.X, padx=8, pady=(8, 4))
+        
+        self.time_label_left = tk.Label(seek_frame, text="00:00:00", bg=COLORS['control_bg'], fg=COLORS['text'], font=('Segoe UI', 8))
+        self.time_label_left.pack(side=tk.LEFT, padx=(0, 8))
+        
+        self.progress_var = tk.DoubleVar()
+        self.progress_scale = ttk.Scale(seek_frame, from_=0, to=100, orient=tk.HORIZONTAL, variable=self.progress_var, command=self.on_seek_start, style='MPC.Horizontal.TScale')
+        self.progress_scale.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.progress_scale.bind("<ButtonRelease-1>", self.on_seek_end)
+        
+        self.time_label_right = tk.Label(seek_frame, text="00:00:00", bg=COLORS['control_bg'], fg=COLORS['text'], font=('Segoe UI', 8))
+        self.time_label_right.pack(side=tk.LEFT, padx=(8, 0))
+        
+        # Controls Row
+        ctrl_frame = tk.Frame(panel, bg=COLORS['control_bg'])
+        ctrl_frame.pack(fill=tk.X, padx=8, pady=(4, 8))
+        
+        # Left: Playback
+        left = tk.Frame(ctrl_frame, bg=COLORS['control_bg'])
+        left.pack(side=tk.LEFT)
+        
+        StyledButton(left, text="⮜", command=lambda: self.skip(-10), width=3).pack(side=tk.LEFT, padx=2)
+        self.play_btn = StyledButton(left, text="▶", command=self.toggle_play_pause, width=4, font=('Segoe UI', 10))
+        self.play_btn.pack(side=tk.LEFT, padx=2)
+        StyledButton(left, text="■", command=self.stop_stream, width=3).pack(side=tk.LEFT, padx=2)
+        StyledButton(left, text="⮞", command=lambda: self.skip(10), width=3).pack(side=tk.LEFT, padx=2)
+        
+        # Center: Status & Quality
+        center = tk.Frame(ctrl_frame, bg=COLORS['control_bg'])
+        center.pack(side=tk.LEFT, expand=True)
+        
+        self.status_label = tk.Label(center, text="Ready", bg=COLORS['control_bg'], fg=COLORS['text_gray'], font=('Segoe UI', 8))
+        self.status_label.pack()
+        
+        # Quality Selector (Hidden initially)
+        self.quality_var = tk.StringVar()
+        self.quality_combo = ttk.Combobox(center, textvariable=self.quality_var, state="readonly", width=15)
+        self.quality_combo.bind("<<ComboboxSelected>>", self.on_quality_change)
+        
+        # Right: Volume
+        right = tk.Frame(ctrl_frame, bg=COLORS['control_bg'])
+        right.pack(side=tk.RIGHT)
+        
+        self.mute_btn = StyledButton(right, text="🔊", command=self.toggle_mute, width=3)
+        self.mute_btn.pack(side=tk.LEFT, padx=2)
+        
+        self.volume_var = tk.IntVar(value=100)
+        ttk.Scale(right, from_=0, to=100, orient=tk.HORIZONTAL, variable=self.volume_var, command=self.on_volume_change, length=80, style='MPC.Horizontal.TScale').pack(side=tk.LEFT, padx=5)
+        self.volume_label = tk.Label(right, text="100%", bg=COLORS['control_bg'], fg=COLORS['text'], font=('Segoe UI', 8), width=5)
+        self.volume_label.pack(side=tk.LEFT, padx=2)
+
+    # ------------------------------------------------------------------
+    #  Logic
+    # ------------------------------------------------------------------
+    def show_open_dialog(self):
+        if self.show_config:
+            self.config_panel.pack_forget()
+            self.show_config = False
+        else:
+            # Find toolbar to pack after
+            toolbar = self.player_area.winfo_children()[0]
+            self.config_panel.pack(fill=tk.X, after=toolbar, padx=4, pady=4)
+            self.show_config = True
+            self.url_entry.focus_set()
+
+    def toggle_history(self):
+        self.show_history = not self.show_history
+        if self.show_history:
+            self.history_panel.pack(side=tk.RIGHT, fill=tk.Y)
+        else:
+            self.history_panel.pack_forget()
+
+    def toggle_always_on_top(self):
+        self.root.attributes('-topmost', self.always_on_top_var.get())
+
+    def load_from_history(self, url):
+        self.url_entry.delete(0, tk.END)
+        self.url_entry.insert(0, url)
+        self.load_and_play_stream()
+
+    def refresh_history(self):
+        history = load_history()
+        self.history_panel.update_history(history)
+
+    def load_and_play_stream(self):
+        url = self.url_entry.get().strip()
+        ref = self.referer_entry.get().strip()
+        ua = USER_AGENTS[self.ua_var.get()]
+
+        if not url: return
+        
+        self.current_url = url
+        self.status_label.config(text="Loading...", fg=COLORS['text'])
+        
+        # Save to history
+        save_history(url)
+        self.refresh_history()
+        
+        # Hide config
+        if self.show_config:
+            self.config_panel.pack_forget()
+            self.show_config = False
+            
+        # Threaded load
+        threading.Thread(target=self._load_thread, args=(url, ref, ua), daemon=True).start()
+
+    def _load_thread(self, url, ref, ua):
+        try:
+            # Check URL validity first
+            headers = {"Referer": ref, "User-Agent": ua}
+            r = requests.head(url, headers=headers, timeout=10, allow_redirects=True)
+            if r.status_code >= 400:
+                self.root.after(0, lambda: messagebox.showerror("Error", f"HTTP {r.status_code}"))
+                return
+
+            if self.player:
+                self.player.stop()
+                self.player.play(url, headers={"Referer": ref}, user_agent=ua)
+                
+                self.is_playing = True
+                self.root.after(0, self._on_play_start)
+                
+        except Exception as e:
+            self.root.after(0, lambda: messagebox.showerror("Error", str(e)))
+
+    def _on_play_start(self):
+        self.play_btn.config(text="⏸")
+        self.status_label.config(text="Playing", fg='green')
+        self.video_canvas.focus_set()
+        
+        # Update Quality List
+        self.root.after(2000, self.update_quality_list)
+
+    def update_quality_list(self):
+        if not self.player: return
+        tracks = self.player.get_video_tracks()
+        if not tracks: return
+        
+        # Filter video tracks
+        video_tracks = [t for t in tracks if t['type'] == 'video']
+        if len(video_tracks) > 1:
+            values = [f"{t['id']}: {t.get('demux-h')}p ({t.get('codec')})" for t in video_tracks]
+            self.quality_combo['values'] = values
+            self.quality_combo.pack(pady=2) # Show combo
+        else:
+            self.quality_combo.pack_forget()
+
+    def on_quality_change(self, event):
+        selection = self.quality_combo.get()
+        if selection:
+            track_id = int(selection.split(':')[0])
+            self.player.set_video_track(track_id)
+
+    def toggle_play_pause(self):
+        if self.player and self.player.pause():
+            self.play_btn.config(text="▶")
+            self.status_label.config(text="Paused", fg='orange')
+        else:
+            self.play_btn.config(text="⏸")
+            self.status_label.config(text="Playing", fg='green')
+
+    def stop_stream(self):
+        if self.player:
+            self.player.stop()
+            self.is_playing = False
+            self.play_btn.config(text="▶")
+            self.status_label.config(text="Stopped", fg='red')
+            self.time_label_left.config(text="00:00:00")
+            self.progress_var.set(0)
+            
+            if self.is_recording:
+                self.toggle_recording()
+
+    def toggle_recording(self):
+        if not self.is_playing: return
+        
+        if not self.is_recording:
+            # Start Recording
+            if not os.path.exists("downloads"):
+                os.makedirs("downloads")
+            
+            filename = f"stream_{datetime.now().strftime('%Y%m%d_%H%M%S')}.ts"
+            filepath = os.path.join("downloads", filename)
+            filepath = get_unique_filename("downloads", filename)
+            
+            self.player.start_recording(filepath)
+            self.is_recording = True
+            self.record_btn.config(bg=COLORS['record_active'], text="● Stop Rec")
+            messagebox.showinfo("Recording Started", f"Recording to: {filepath}")
+        else:
+            # Stop Recording
+            self.player.stop_recording()
+            self.is_recording = False
+            self.record_btn.config(bg=COLORS['button_bg'], text="● Record")
+            messagebox.showinfo("Recording Stopped", "Recording saved.")
+
+    def skip(self, seconds):
+        if self.player: self.player.seek(seconds)
+
+    def on_seek_start(self, _): self.is_seeking = True
+    def on_seek_end(self, _):
+        if self.player:
+            dur = self.player.get_duration()
+            if dur:
+                t = (self.progress_var.get() / 100.0) * dur
+                self.player.seek(t, "absolute")
+        self.is_seeking = False
+
+    def toggle_mute(self):
+        if not self.player: return
+        vol = self.volume_var.get()
+        if vol > 0:
+            self.previous_volume = vol
+            self.volume_var.set(0)
+            self.player.set_volume(0)
+            self.mute_btn.config(text="🔇")
+        else:
+            self.volume_var.set(self.previous_volume)
+            self.player.set_volume(self.previous_volume)
+            self.mute_btn.config(text="🔊")
+
+    def on_volume_change(self, val):
+        if self.player:
+            v = int(float(val))
+            self.player.set_volume(v)
+            self.volume_label.config(text=f"{v}%")
+            self.mute_btn.config(text="🔇" if v == 0 else "🔊")
+
+    def update_player_info(self):
+        if self.player and self.is_playing:
+            try:
+                cur = self.player.get_time_pos()
+                dur = self.player.get_duration()
+                if cur is not None and dur and not self.is_seeking:
+                    self.time_label_left.config(text=format_time(cur))
+                    self.time_label_right.config(text=format_time(dur))
+                    self.progress_var.set((cur / dur) * 100)
+            except: pass
+        self.root.after(1000, self.update_player_info)
+
+    # ------------------------------------------------------------------
+    #  Fullscreen & Resize
+    # ------------------------------------------------------------------
+    def toggle_fullscreen(self):
+        if not self.is_fullscreen:
+            self.enter_fullscreen()
+        else:
+            self.exit_fullscreen()
+
+    def enter_fullscreen(self):
+        self.normal_geometry = self.root.geometry()
+        self.fullscreen_window = tk.Toplevel(self.root)
+        self.fullscreen_window.configure(bg='#000000')
+        self.fullscreen_window.attributes('-fullscreen', True)
+        self.fullscreen_window.attributes('-topmost', True)
+        
+        self.fullscreen_video_frame = tk.Frame(self.fullscreen_window, bg='#000000')
+        self.fullscreen_video_frame.pack(fill=tk.BOTH, expand=True)
+        self.fullscreen_window.update_idletasks()
+        
+        if self.player:
+            self.player.set_wid(self.fullscreen_video_frame.winfo_id())
+            
+        # Bindings for fullscreen
+        self.fullscreen_window.bind('<Escape>', lambda e: self.exit_fullscreen())
+        self.fullscreen_window.bind('f', lambda e: self.toggle_fullscreen())
+        self.fullscreen_window.bind('<space>', lambda e: self.toggle_play_pause())
+        
+        self.is_fullscreen = True
+
+    def exit_fullscreen(self):
+        if self.fullscreen_window:
+            self.fullscreen_window.destroy()
+            self.fullscreen_window = None
+            
+        if self.player:
+            self.player.set_wid(self.video_canvas.winfo_id())
+            
+        self.is_fullscreen = False
+
+    def on_window_resize(self, event):
+        if self.player and not self.is_fullscreen and event.widget == self.root:
+            self.root.after(200, lambda: self.player.set_wid(self.video_canvas.winfo_id()))
+
+    def on_closing(self):
+        if self.player: self.player.terminate()
+        self.root.destroy()

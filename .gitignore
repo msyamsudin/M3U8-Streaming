@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Distribution / Packaging
+build/
+dist/
+*.spec
+
+# VS Code
+.vscode/
+
+# Project Specific
+downloads/
+history.json
+*.log
+
+# MPV DLLs (Large files, should be downloaded separately)
+libmpv-2.dll
+mpv-1.dll
+mpv/
