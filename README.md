@@ -2,15 +2,15 @@
 
 M3U8 Streaming Player dibangun dengan Python (Tkinter) dan MPV.
 
+<img width="1252" height="815" alt="image" src="https://github.com/user-attachments/assets/4f9476f6-ff30-4e61-950d-28e14b99a66e" />
+
+
 ## Fitur
 
-*   **Pemutaran Stream**: Mendukung HLS (M3U8) dan format stream lainnya.
+*   **Pemutaran Stream**: Mendukung HLS (M3U8)
 *   **Perekaman**: Rekam siaran langsung langsung ke disk (format `.ts`).
-*   **Pilihan Kualitas**: Ganti kualitas/resolusi video yang tersedia secara langsung (on-the-fly).
 *   **Riwayat**: Menyimpan URL yang baru saja diputar untuk akses cepat.
 *   **UI Modern**: Tema gelap yang terinspirasi dari MPC-HC dengan kontrol kustom.
-*   **Selalu di Atas**: Opsi "Always on Top" agar player tetap terlihat saat multitasking.
-*   **Layar Penuh**: Mode fullscreen untuk pengalaman menonton yang lebih baik.
 
 ## Persyaratan Sistem
 
@@ -41,10 +41,10 @@ Jalankan aplikasi dengan perintah:
 python main.py
 ```
 
-### Pintasan Keyboard (Shortcuts)
+### Shortcut
 
 *   `Spasi`: Play/Pause
-*   `F` / `Klik Ganda`: Toggle Fullscreen (Layar Penuh)
+*   `F` / `Double Click`: Toggle Fullscreen (Layar Penuh)
 *   `Kiri` / `Kanan`: Mundur/Maju 10 detik
 *   `Ctrl+O`: Buka dialog URL
 *   `Esc`: Keluar dari Fullscreen
