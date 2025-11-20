@@ -32,7 +32,7 @@ M3U8 Streaming Player dibangun dengan Python (Tkinter) dan MPV.
     pip install python-mpv requests
     ```
 
-3.  **PENTING**: Download `libmpv-2.dll` (dan `mpv-1.dll` jika diperlukan) dari [shinchiro's builds](https://sourceforge.net/projects/mpv-player-windows/files/libmpv/) dan letakkan file tersebut di folder root proyek ini.
+3.  **PENTING**: Download `libmpv-2.dll` dari [shinchiro's builds](https://sourceforge.net/projects/mpv-player-windows/files/libmpv/) dan letakkan file tersebut di folder root proyek ini.
 
 ## Cara Penggunaan
 
