@@ -112,22 +112,7 @@ class M3U8StreamingPlayer:
         self.player_area = tk.Frame(self.main_container, bg=COLORS['bg'])
         self.player_area.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        # Toolbar
-        toolbar = tk.Frame(self.player_area, bg=COLORS['toolbar_bg'], relief=tk.RAISED, bd=1)
-        toolbar.pack(fill=tk.X, side=tk.TOP)
-        
-        StyledButton(toolbar, text="Open", command=self.show_open_dialog).pack(side=tk.LEFT, padx=1, pady=4)
-        StyledButton(toolbar, text="▶", command=self.toggle_play_pause, width=3).pack(side=tk.LEFT, padx=1, pady=4)
-        StyledButton(toolbar, text="■", command=self.stop_stream, width=3).pack(side=tk.LEFT, padx=1, pady=4)
-        
-        tk.Frame(toolbar, bg=COLORS['border'], width=1).pack(side=tk.LEFT, fill=tk.Y, padx=4, pady=6)
-        
-        self.record_btn = StyledButton(toolbar, text="● Record", command=self.toggle_recording)
-        self.record_btn.pack(side=tk.LEFT, padx=1, pady=4)
-        
-        tk.Frame(toolbar, bg=COLORS['border'], width=1).pack(side=tk.LEFT, fill=tk.Y, padx=4, pady=6)
-        
-        StyledButton(toolbar, text="⛶ Fullscreen", command=self.toggle_fullscreen).pack(side=tk.LEFT, padx=1, pady=4)
+
 
         # Config Panel
         self.setup_config_panel()
@@ -198,11 +183,17 @@ class M3U8StreamingPlayer:
         left = tk.Frame(ctrl_frame, bg=COLORS['control_bg'])
         left.pack(side=tk.LEFT)
         
+        StyledButton(left, text="Open", command=self.show_open_dialog).pack(side=tk.LEFT, padx=2)
         StyledButton(left, text="⮜", command=lambda: self.skip(-10), width=3).pack(side=tk.LEFT, padx=2)
         self.play_btn = StyledButton(left, text="▶", command=self.toggle_play_pause, width=4, font=('Segoe UI', 10))
         self.play_btn.pack(side=tk.LEFT, padx=2)
         StyledButton(left, text="■", command=self.stop_stream, width=3).pack(side=tk.LEFT, padx=2)
         StyledButton(left, text="⮞", command=lambda: self.skip(10), width=3).pack(side=tk.LEFT, padx=2)
+        
+        self.record_btn = StyledButton(left, text="● Rec", command=self.toggle_recording)
+        self.record_btn.pack(side=tk.LEFT, padx=2)
+        
+        StyledButton(left, text="⛶", command=self.toggle_fullscreen, width=3).pack(side=tk.LEFT, padx=2)
         
         # Center: Status & Quality
         center = tk.Frame(ctrl_frame, bg=COLORS['control_bg'])
@@ -236,9 +227,7 @@ class M3U8StreamingPlayer:
             self.config_panel.pack_forget()
             self.show_config = False
         else:
-            # Find toolbar to pack after
-            toolbar = self.player_area.winfo_children()[0]
-            self.config_panel.pack(fill=tk.X, after=toolbar, padx=4, pady=4)
+            self.config_panel.pack(fill=tk.X, side=tk.TOP, before=self.video_frame, padx=4, pady=4)
             self.show_config = True
             self.url_entry.focus_set()
 
@@ -382,7 +371,7 @@ class M3U8StreamingPlayer:
             # Stop Recording
             self.player.stop_recording()
             self.is_recording = False
-            self.record_btn.config(bg=COLORS['button_bg'], text="● Record")
+            self.record_btn.config(bg=COLORS['button_bg'], text="● Rec")
             messagebox.showinfo("Recording Stopped", "Recording saved.")
 
     def skip(self, seconds):
