@@ -44,6 +44,12 @@ class M3U8StreamingPlayer:
             self.player = MpvPlayer(wid=self.video_canvas.winfo_id())
         except Exception as e:
             messagebox.showerror("Error", str(e))
+
+        # Bind MPV Double Click
+        if self.player and self.player.mpv:
+            @self.player.mpv.key_binding('MOUSE_BTN0_DBL')
+            def on_mpv_dbl_click(state=None, name=None, char=None):
+                self.root.after(0, self.toggle_fullscreen)
             
         # Start periodic updates
         self.update_player_info()
@@ -69,6 +75,9 @@ class M3U8StreamingPlayer:
         self.root.bind("<Control-o>", lambda e: self.show_open_dialog())
         self.root.bind("<Control-O>", lambda e: self.show_open_dialog())
         self.root.bind("<Configure>", self.on_window_resize)
+        
+        # Video Canvas Bindings
+        self.video_canvas.bind("<Double-Button-1>", lambda e: self.toggle_fullscreen())
 
     def setup_menu(self):
         menubar = Menu(self.root, bg=COLORS['menu_bg'], fg=COLORS['text'], 
@@ -432,6 +441,7 @@ class M3U8StreamingPlayer:
         self.fullscreen_window.bind('<Escape>', lambda e: self.exit_fullscreen())
         self.fullscreen_window.bind('f', lambda e: self.toggle_fullscreen())
         self.fullscreen_window.bind('<space>', lambda e: self.toggle_play_pause())
+        self.fullscreen_window.bind('<Double-Button-1>', lambda e: self.toggle_fullscreen())
         
         self.is_fullscreen = True
 
