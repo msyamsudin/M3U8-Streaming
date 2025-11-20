@@ -96,10 +96,16 @@ class M3U8StreamingPlayer:
         # View menu
         view_menu = Menu(menubar, tearoff=0, bg=COLORS['menu_bg'], fg=COLORS['text'])
         view_menu.add_command(label="Fullscreen (F)", command=self.toggle_fullscreen)
-        view_menu.add_checkbutton(label="Show History", command=self.toggle_history)
         self.always_on_top_var = tk.BooleanVar(value=False)
         view_menu.add_checkbutton(label="Always on Top", variable=self.always_on_top_var, command=self.toggle_always_on_top)
         menubar.add_cascade(label="View", menu=view_menu)
+
+        # History menu
+        history_menu = Menu(menubar, tearoff=0, bg=COLORS['menu_bg'], fg=COLORS['text'])
+        history_menu.add_checkbutton(label="Show History (H)", command=self.toggle_history)
+        history_menu.add_separator()
+        history_menu.add_command(label="Clear All History", command=self.clear_history)
+        menubar.add_cascade(label="History", menu=history_menu)
         
         self.root.config(menu=menubar)
 
@@ -110,7 +116,7 @@ class M3U8StreamingPlayer:
 
         # Left side (Player)
         self.player_area = tk.Frame(self.main_container, bg=COLORS['bg'])
-        self.player_area.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.player_area.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
 
 
@@ -129,7 +135,7 @@ class M3U8StreamingPlayer:
 
         # Right side (History) - Initially hidden
         self.history_panel = HistoryPanel(self.main_container, self.load_from_history, 
-                                        self.delete_history_item, self.clear_history, width=250)
+                                        self.delete_history_item, self.clear_history)
 
     def setup_config_panel(self):
         self.config_panel = tk.Frame(self.player_area, bg=COLORS['bg'], relief=tk.GROOVE, bd=2)
@@ -234,7 +240,7 @@ class M3U8StreamingPlayer:
     def toggle_history(self):
         self.show_history = not self.show_history
         if self.show_history:
-            self.history_panel.pack(side=tk.RIGHT, fill=tk.Y)
+            self.history_panel.pack(side=tk.BOTTOM, fill=tk.X)
         else:
             self.history_panel.pack_forget()
 
