@@ -23,7 +23,7 @@ M3U8 Streaming Player dibangun dengan Python (Tkinter) dan MPV.
 
 1.  Clone repositori ini:
     ```bash
-    git clone [https://github.com/username-anda/m3u8-streaming-player.git](https://github.com/msyamsudin/M3U8-Streaming.git)
+    git clone https://github.com/msyamsudin/M3U8-Streaming.git
     cd m3u8-streaming-player
     ```
 
