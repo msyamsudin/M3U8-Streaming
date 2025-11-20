@@ -85,7 +85,7 @@ python main.py
 | `←` / `→`                 | Mundur / Maju 10 detik |
 | `Ctrl + O`                | Input URL Stream       |
 | `Esc`                     | Keluar dari Fullscreen |
-
+| `H`                       | Tampilkan Riwayat      |
 ---
 
 ## 🎥 Cara Merekam Streaming
