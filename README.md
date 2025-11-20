@@ -116,10 +116,3 @@ https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
 | Tidak bisa merekam          | Pastikan folder `downloads/` tidak diblok/readonly         |
 | Error `ModuleNotFoundError` | Install library: `pip install python-mpv requests`         |
 | Streaming lag/stutter       | Cek koneksi internet, bitrate tinggi butuh bandwidth lebih |
-
----
-
-## 📄 Lisensi
-
-Proyek ini menggunakan lisensi **MIT License**.
-📌 Lihat berkas [`LICENSE`](https://github.com/msyamsudin/M3U8-Streaming/blob/main/LICENSE)

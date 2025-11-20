@@ -20,9 +20,11 @@ class StyledButton(tk.Button):
         super().__init__(master, **config)
 
 class HistoryPanel(tk.Frame):
-    def __init__(self, master, on_play_callback, **kwargs):
+    def __init__(self, master, on_play_callback, on_delete_callback, on_clear_callback, **kwargs):
         super().__init__(master, bg=COLORS['bg'], **kwargs)
         self.on_play_callback = on_play_callback
+        self.on_delete_callback = on_delete_callback
+        self.on_clear_callback = on_clear_callback
         
         # Header
         header = tk.Frame(self, bg=COLORS['menu_bg'])
@@ -46,6 +48,13 @@ class HistoryPanel(tk.Frame):
         
         self.listbox.bind('<Double-Button-1>', self._on_double_click)
         
+        # Buttons
+        btn_frame = tk.Frame(self, bg=COLORS['bg'])
+        btn_frame.pack(fill=tk.X, pady=5, padx=5)
+        
+        StyledButton(btn_frame, text="Delete", command=self._on_delete_btn).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 2))
+        StyledButton(btn_frame, text="Clear All", command=self._on_clear_btn).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(2, 0))
+        
         self.history_data = []
 
     def update_history(self, history_list):
@@ -63,3 +72,12 @@ class HistoryPanel(tk.Frame):
             if index < len(self.history_data):
                 url = self.history_data[index]['url']
                 self.on_play_callback(url)
+
+    def _on_delete_btn(self):
+        selection = self.listbox.curselection()
+        if selection:
+            index = selection[0]
+            self.on_delete_callback(index)
+
+    def _on_clear_btn(self):
+        self.on_clear_callback()

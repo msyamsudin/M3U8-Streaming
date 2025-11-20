@@ -53,6 +53,14 @@ def save_history(url, name=None):
     except Exception as e:
         print(f"Error saving history: {e}")
 
+def write_history(history):
+    """Write the entire history list to file."""
+    try:
+        with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
+            json.dump(history, f, indent=2)
+    except Exception as e:
+        print(f"Error saving history: {e}")
+
 def get_unique_filename(base_path, filename):
     """Get a unique filename by appending a counter if file exists."""
     name, ext = os.path.splitext(filename)

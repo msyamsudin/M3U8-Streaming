@@ -8,7 +8,7 @@ from datetime import datetime
 from .config import COLORS, USER_AGENTS
 from .player_core import MpvPlayer
 from .ui_components import StyledButton, HistoryPanel
-from .utils import format_time, load_history, save_history, get_unique_filename
+from .utils import format_time, load_history, save_history, get_unique_filename, write_history
 
 class M3U8StreamingPlayer:
     def __init__(self, root):
@@ -68,6 +68,8 @@ class M3U8StreamingPlayer:
     def setup_bindings(self):
         self.root.bind("<f>", lambda e: self.toggle_fullscreen())
         self.root.bind("<F>", lambda e: self.toggle_fullscreen())
+        self.root.bind("<h>", lambda e: self.toggle_history())
+        self.root.bind("<H>", lambda e: self.toggle_history())
         self.root.bind("<Escape>", lambda e: self.exit_fullscreen())
         self.root.bind("<Right>", lambda e: self.skip(10))
         self.root.bind("<Left>", lambda e: self.skip(-10))
@@ -141,7 +143,8 @@ class M3U8StreamingPlayer:
         self.setup_control_panel()
 
         # Right side (History) - Initially hidden
-        self.history_panel = HistoryPanel(self.main_container, self.load_from_history, width=250)
+        self.history_panel = HistoryPanel(self.main_container, self.load_from_history, 
+                                        self.delete_history_item, self.clear_history, width=250)
 
     def setup_config_panel(self):
         self.config_panel = tk.Frame(self.player_area, bg=COLORS['bg'], relief=tk.GROOVE, bd=2)
@@ -257,6 +260,18 @@ class M3U8StreamingPlayer:
     def refresh_history(self):
         history = load_history()
         self.history_panel.update_history(history)
+
+    def delete_history_item(self, index):
+        history = load_history()
+        if 0 <= index < len(history):
+            del history[index]
+            write_history(history)
+            self.refresh_history()
+
+    def clear_history(self):
+        if messagebox.askyesno("Confirm", "Are you sure you want to clear all history?"):
+            write_history([])
+            self.refresh_history()
 
     def load_and_play_stream(self):
         url = self.url_entry.get().strip()
