@@ -334,7 +334,18 @@ class M3U8StreamingPlayer:
             pos = item['last_position']
             formatted = format_time(pos)
             if messagebox.askyesno("Resume Playback", f"Resume from {formatted}?"):
-                self.player.seek(pos, "absolute")
+                self._retry_seek(pos)
+
+    def _retry_seek(self, pos, attempt=1):
+        """Try to seek to the position, retrying if MPV is not ready."""
+        try:
+            self.player.seek(pos, "absolute")
+        except Exception as e:
+            if attempt <= 3:
+                print(f"Seek failed (attempt {attempt}): {e}. Retrying in 1s...")
+                self.root.after(1000, lambda: self._retry_seek(pos, attempt + 1))
+            else:
+                messagebox.showerror("Error", f"Failed to resume playback after multiple attempts.\n{e}")
 
     def update_quality_list(self):
         if not self.player: return
