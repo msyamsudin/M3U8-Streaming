@@ -47,6 +47,7 @@ class HistoryPanel(tk.Frame):
         self.listbox.config(yscrollcommand=scrollbar.set)
         
         self.listbox.bind('<Double-Button-1>', self._on_double_click)
+        self.listbox.bind('<Return>', self._on_double_click)
         
         # Buttons
         btn_frame = tk.Frame(self, bg=COLORS['bg'])

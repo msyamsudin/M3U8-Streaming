@@ -249,6 +249,7 @@ class M3U8StreamingPlayer:
         self.show_history = not self.show_history
         if self.show_history:
             self.history_panel.pack(side=tk.BOTTOM, fill=tk.X)
+            self.history_panel.listbox.focus_set()
         else:
             self.history_panel.pack_forget()
 
@@ -506,6 +507,10 @@ class M3U8StreamingPlayer:
         self.config_panel.pack_forget()
         self.history_panel.pack_forget()
         
+        # Switch controls to overlay mode
+        self.control_panel.pack_forget()
+        self.controls_visible = False
+        
         # Hide menu
         self.root.config(menu='')
         
@@ -519,6 +524,7 @@ class M3U8StreamingPlayer:
         
         # Auto-hide bindings
         self.root.bind('<Motion>', self.on_fullscreen_motion)
+        self.show_controls()
         self.schedule_hide_controls()
 
     def exit_fullscreen(self):
@@ -536,7 +542,12 @@ class M3U8StreamingPlayer:
             self.hide_timer = None
             
         # Ensure controls are visible
+        self.control_panel.place_forget()
+        self.controls_visible = False
         self.show_controls()
+        
+        # Restore cursor
+        self.root.config(cursor="")
         
         # Restore menu
         self.root.config(menu=self.menubar)
@@ -565,14 +576,21 @@ class M3U8StreamingPlayer:
             self.schedule_hide_controls()
 
     def show_controls(self):
+        self.root.config(cursor="")
         if not self.controls_visible:
-            self.control_panel.pack(fill=tk.X, side=tk.BOTTOM)
+            if self.is_fullscreen:
+                self.control_panel.place(relx=0, rely=1, anchor='sw', relwidth=1)
+                self.control_panel.lift()
+            else:
+                self.control_panel.pack(fill=tk.X, side=tk.BOTTOM)
             self.controls_visible = True
 
     def hide_controls(self):
         if self.controls_visible and self.is_fullscreen:
+            self.control_panel.place_forget()
             self.control_panel.pack_forget()
             self.controls_visible = False
+            self.root.config(cursor="none")
 
     def schedule_hide_controls(self):
         if self.hide_timer:
