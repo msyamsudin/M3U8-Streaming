@@ -31,11 +31,19 @@ def save_history(url, name=None):
     """Save a URL to history, avoiding duplicates at the top."""
     history = load_history()
     
+    # Check for existing position
+    last_pos = 0
+    for h in history:
+        if h['url'] == url:
+            last_pos = h.get('last_position', 0)
+            break
+            
     # Create entry
     entry = {
         "url": url,
         "name": name or url,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "last_position": last_pos
     }
     
     # Remove existing entry with same URL if exists
@@ -52,6 +60,28 @@ def save_history(url, name=None):
             json.dump(history, f, indent=2)
     except Exception as e:
         print(f"Error saving history: {e}")
+
+def update_history_progress(url, position):
+    """Update the last playback position for a URL."""
+    history = load_history()
+    found = False
+    for item in history:
+        if item['url'] == url:
+            item['last_position'] = position
+            item['timestamp'] = datetime.now().isoformat()
+            found = True
+            break
+    
+    if found:
+        write_history(history)
+
+def get_history_item(url):
+    """Get history item by URL."""
+    history = load_history()
+    for item in history:
+        if item['url'] == url:
+            return item
+    return None
 
 def write_history(history):
     """Write the entire history list to file."""

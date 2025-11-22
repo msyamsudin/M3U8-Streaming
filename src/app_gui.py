@@ -8,7 +8,7 @@ from datetime import datetime
 from .config import COLORS, USER_AGENTS
 from .player_core import MpvPlayer
 from .ui_components import StyledButton, HistoryPanel
-from .utils import format_time, load_history, save_history, get_unique_filename, write_history
+from .utils import format_time, load_history, save_history, get_unique_filename, write_history, update_history_progress, get_history_item
 
 class M3U8StreamingPlayer:
     def __init__(self, root):
@@ -324,6 +324,17 @@ class M3U8StreamingPlayer:
         
         # Update Quality List
         self.root.after(2000, self.update_quality_list)
+        
+        # Check for resume
+        self.root.after(500, self.check_resume_playback)
+
+    def check_resume_playback(self):
+        item = get_history_item(self.current_url)
+        if item and item.get('last_position', 0) > 5:
+            pos = item['last_position']
+            formatted = format_time(pos)
+            if messagebox.askyesno("Resume Playback", f"Resume from {formatted}?"):
+                self.player.seek(pos, "absolute")
 
     def update_quality_list(self):
         if not self.player: return
@@ -359,6 +370,13 @@ class M3U8StreamingPlayer:
             self.is_playing = False
             self.play_btn.config(text="▶")
             self.status_label.config(text="Stopped", fg='red')
+            
+            # Save progress before stopping
+            try:
+                pos = self.player.get_time_pos()
+                if pos: update_history_progress(self.current_url, pos)
+            except: pass
+            
             self.time_label_left.config(text="00:00:00")
             self.progress_var.set(0)
             
@@ -429,6 +447,10 @@ class M3U8StreamingPlayer:
                     self.time_label_left.config(text=format_time(cur))
                     self.time_label_right.config(text=format_time(dur))
                     self.progress_var.set((cur / dur) * 100)
+                    
+                    # Save progress every 5 seconds approx (modulo check)
+                    if int(cur) % 5 == 0:
+                        update_history_progress(self.current_url, cur)
             except: pass
         self.root.after(1000, self.update_player_info)
 
@@ -544,5 +566,11 @@ class M3U8StreamingPlayer:
         pass
 
     def on_closing(self):
-        if self.player: self.player.terminate()
+        if self.player:
+            # Save final progress
+            try:
+                pos = self.player.get_time_pos()
+                if pos: update_history_progress(self.current_url, pos)
+            except: pass
+            self.player.terminate()
         self.root.destroy()
