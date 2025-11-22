@@ -166,7 +166,7 @@ class M3U8StreamingPlayer:
         self.ua_var = tk.StringVar(value="Chrome")
         ttk.Combobox(inner, textvariable=self.ua_var, values=list(USER_AGENTS.keys()), state="readonly").grid(row=2, column=1, sticky=tk.W, padx=5, pady=5)
         
-        StyledButton(inner, text="Load Stream", command=self.load_and_play_stream).grid(row=3, column=1, sticky=tk.E, padx=5, pady=10)
+        StyledButton(inner, text="Load Stream", command=self.load_and_play_stream).grid(row=2, column=1, sticky=tk.E, padx=5, pady=5)
         
         inner.columnconfigure(1, weight=1)
 
