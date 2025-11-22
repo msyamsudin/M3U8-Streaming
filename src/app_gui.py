@@ -32,6 +32,8 @@ class M3U8StreamingPlayer:
         self.normal_geometry = None
         self.fullscreen_window = None
         self.fullscreen_video_frame = None
+        self.hide_timer = None
+        self.controls_visible = True
 
         # Initialize UI
         self.setup_menu()
@@ -82,32 +84,32 @@ class M3U8StreamingPlayer:
         self.video_canvas.bind("<Double-Button-1>", lambda e: self.toggle_fullscreen())
 
     def setup_menu(self):
-        menubar = Menu(self.root, bg=COLORS['menu_bg'], fg=COLORS['text'], 
+        self.menubar = Menu(self.root, bg=COLORS['menu_bg'], fg=COLORS['text'], 
                       activebackground=COLORS['button_hover'], activeforeground=COLORS['text'],
                       borderwidth=0, relief=tk.FLAT)
         
         # File menu
-        file_menu = Menu(menubar, tearoff=0, bg=COLORS['menu_bg'], fg=COLORS['text'])
+        file_menu = Menu(self.menubar, tearoff=0, bg=COLORS['menu_bg'], fg=COLORS['text'])
         file_menu.add_command(label="Open URL... (Ctrl+O)", command=self.show_open_dialog)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.on_closing)
-        menubar.add_cascade(label="File", menu=file_menu)
+        self.menubar.add_cascade(label="File", menu=file_menu)
         
         # View menu
-        view_menu = Menu(menubar, tearoff=0, bg=COLORS['menu_bg'], fg=COLORS['text'])
+        view_menu = Menu(self.menubar, tearoff=0, bg=COLORS['menu_bg'], fg=COLORS['text'])
         view_menu.add_command(label="Fullscreen (F)", command=self.toggle_fullscreen)
         self.always_on_top_var = tk.BooleanVar(value=False)
         view_menu.add_checkbutton(label="Always on Top", variable=self.always_on_top_var, command=self.toggle_always_on_top)
-        menubar.add_cascade(label="View", menu=view_menu)
+        self.menubar.add_cascade(label="View", menu=view_menu)
 
         # History menu
-        history_menu = Menu(menubar, tearoff=0, bg=COLORS['menu_bg'], fg=COLORS['text'])
+        history_menu = Menu(self.menubar, tearoff=0, bg=COLORS['menu_bg'], fg=COLORS['text'])
         history_menu.add_checkbutton(label="Show History (H)", command=self.toggle_history)
         history_menu.add_separator()
         history_menu.add_command(label="Clear All History", command=self.clear_history)
-        menubar.add_cascade(label="History", menu=history_menu)
+        self.menubar.add_cascade(label="History", menu=history_menu)
         
-        self.root.config(menu=menubar)
+        self.root.config(menu=self.menubar)
 
     def setup_ui(self):
         # Main container (Horizontal for History Panel)
@@ -163,11 +165,11 @@ class M3U8StreamingPlayer:
         inner.columnconfigure(1, weight=1)
 
     def setup_control_panel(self):
-        panel = tk.Frame(self.player_area, bg=COLORS['control_bg'], relief=tk.RAISED, bd=1)
-        panel.pack(fill=tk.X, side=tk.BOTTOM)
+        self.control_panel = tk.Frame(self.player_area, bg=COLORS['control_bg'], relief=tk.RAISED, bd=1)
+        self.control_panel.pack(fill=tk.X, side=tk.BOTTOM)
         
         # Seekbar
-        seek_frame = tk.Frame(panel, bg=COLORS['control_bg'])
+        seek_frame = tk.Frame(self.control_panel, bg=COLORS['control_bg'])
         seek_frame.pack(fill=tk.X, padx=8, pady=(8, 4))
         
         self.time_label_left = tk.Label(seek_frame, text="00:00:00", bg=COLORS['control_bg'], fg=COLORS['text'], font=('Segoe UI', 8))
@@ -182,7 +184,7 @@ class M3U8StreamingPlayer:
         self.time_label_right.pack(side=tk.LEFT, padx=(8, 0))
         
         # Controls Row
-        ctrl_frame = tk.Frame(panel, bg=COLORS['control_bg'])
+        ctrl_frame = tk.Frame(self.control_panel, bg=COLORS['control_bg'])
         ctrl_frame.pack(fill=tk.X, padx=8, pady=(4, 8))
         
         # Left: Playback
@@ -435,41 +437,79 @@ class M3U8StreamingPlayer:
 
     def enter_fullscreen(self):
         self.normal_geometry = self.root.geometry()
-        self.fullscreen_window = tk.Toplevel(self.root)
-        self.fullscreen_window.configure(bg='#000000')
-        self.fullscreen_window.attributes('-fullscreen', True)
-        self.fullscreen_window.attributes('-topmost', True)
         
-        self.fullscreen_video_frame = tk.Frame(self.fullscreen_window, bg='#000000')
-        self.fullscreen_video_frame.pack(fill=tk.BOTH, expand=True)
-        self.fullscreen_window.update_idletasks()
+        # Hide panels
+        self.config_panel.pack_forget()
+        self.history_panel.pack_forget()
         
-        if self.player:
-            self.player.set_wid(self.fullscreen_video_frame.winfo_id())
-            
-        # Bindings for fullscreen
-        self.fullscreen_window.bind('<Escape>', lambda e: self.exit_fullscreen())
-        self.fullscreen_window.bind('f', lambda e: self.toggle_fullscreen())
-        self.fullscreen_window.bind('<space>', lambda e: self.toggle_play_pause())
-        self.fullscreen_window.bind('<Double-Button-1>', lambda e: self.toggle_fullscreen())
+        # Hide menu
+        self.root.config(menu='')
         
+        # Set fullscreen
+        self.root.attributes('-fullscreen', True)
         self.is_fullscreen = True
+        
+        # Auto-hide bindings
+        self.root.bind('<Motion>', self.on_fullscreen_motion)
+        self.schedule_hide_controls()
 
     def exit_fullscreen(self):
-        # 1. Move player back to main window FIRST
-        if self.player:
-            self.player.set_wid(self.video_canvas.winfo_id())
-
-        # 2. Then destroy fullscreen window
-        if self.fullscreen_window:
-            self.fullscreen_window.destroy()
-            self.fullscreen_window = None
-            
+        self.root.attributes('-fullscreen', False)
         self.is_fullscreen = False
+        
+        # Remove auto-hide bindings
+        self.root.unbind('<Motion>')
+        if self.hide_timer:
+            self.root.after_cancel(self.hide_timer)
+            self.hide_timer = None
+            
+        # Ensure controls are visible
+        self.show_controls()
+        
+        # Restore menu
+        self.root.config(menu=self.menubar)
+        
+        # Restore panels if they were enabled
+        if self.show_config:
+            self.config_panel.pack(fill=tk.X, side=tk.TOP, before=self.video_frame, padx=4, pady=4)
+            
+        if self.show_history:
+            self.history_panel.pack(side=tk.BOTTOM, fill=tk.X)
+
+    def on_fullscreen_motion(self, event):
+        if not self.is_fullscreen: return
+        
+        # Show controls if mouse is at bottom 100px or if moving
+        screen_height = self.root.winfo_screenheight()
+        if event.y_root > screen_height - 100:
+            self.show_controls()
+            # Don't hide if hovering controls
+            if self.hide_timer:
+                self.root.after_cancel(self.hide_timer)
+                self.hide_timer = None
+        else:
+            # If moving in upper area, show briefly then hide
+            self.show_controls()
+            self.schedule_hide_controls()
+
+    def show_controls(self):
+        if not self.controls_visible:
+            self.control_panel.pack(fill=tk.X, side=tk.BOTTOM)
+            self.controls_visible = True
+
+    def hide_controls(self):
+        if self.controls_visible and self.is_fullscreen:
+            self.control_panel.pack_forget()
+            self.controls_visible = False
+
+    def schedule_hide_controls(self):
+        if self.hide_timer:
+            self.root.after_cancel(self.hide_timer)
+        self.hide_timer = self.root.after(3000, self.hide_controls)
 
     def on_window_resize(self, event):
-        if self.player and not self.is_fullscreen and event.widget == self.root:
-            self.root.after(200, lambda: self.player.set_wid(self.video_canvas.winfo_id()))
+        # No longer needed to reparent player
+        pass
 
     def on_closing(self):
         if self.player: self.player.terminate()
