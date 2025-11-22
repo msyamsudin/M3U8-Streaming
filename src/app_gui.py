@@ -182,7 +182,7 @@ class M3U8StreamingPlayer:
         self.time_label_left.pack(side=tk.LEFT, padx=(0, 8))
         
         self.progress_var = tk.DoubleVar()
-        self.progress_scale = ttk.Scale(seek_frame, from_=0, to=100, orient=tk.HORIZONTAL, variable=self.progress_var, command=self.on_seek_start, style='MPC.Horizontal.TScale')
+        self.progress_scale = ttk.Scale(seek_frame, from_=0, to=100, orient=tk.HORIZONTAL, variable=self.progress_var, command=self.on_seek_move, style='MPC.Horizontal.TScale')
         self.progress_scale.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self.progress_scale.bind("<ButtonRelease-1>", self.on_seek_end)
         
@@ -420,7 +420,14 @@ class M3U8StreamingPlayer:
     def skip(self, seconds):
         if self.player: self.player.seek(seconds)
 
-    def on_seek_start(self, _): self.is_seeking = True
+    def on_seek_move(self, value):
+        self.is_seeking = True
+        if self.player:
+            dur = self.player.get_duration()
+            if dur:
+                # Update time label with preview
+                t = (float(value) / 100.0) * dur
+                self.time_label_left.config(text=format_time(t))
     def on_seek_end(self, _):
         if self.player:
             dur = self.player.get_duration()
