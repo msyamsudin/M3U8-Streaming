@@ -33,6 +33,7 @@ class M3U8StreamingPlayer:
         self.fullscreen_window = None
         self.fullscreen_video_frame = None
         self.hide_timer = None
+        self.click_timer = None
         self.controls_visible = True
 
         # Initialize UI
@@ -47,11 +48,15 @@ class M3U8StreamingPlayer:
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
-        # Bind MPV Double Click
+        # Bind MPV Mouse Events
         if self.player and self.player.mpv:
+            @self.player.mpv.key_binding('MOUSE_BTN0')
+            def on_mpv_click(state=None, name=None, char=None):
+                self.root.after(0, self.handle_click)
+                
             @self.player.mpv.key_binding('MOUSE_BTN0_DBL')
             def on_mpv_dbl_click(state=None, name=None, char=None):
-                self.root.after(0, self.toggle_fullscreen)
+                self.root.after(0, self.handle_double_click)
             
         # Start periodic updates
         self.update_player_info()
@@ -81,7 +86,8 @@ class M3U8StreamingPlayer:
         self.root.bind("<Configure>", self.on_window_resize)
         
         # Video Canvas Bindings
-        self.video_canvas.bind("<Double-Button-1>", lambda e: self.toggle_fullscreen())
+        self.video_canvas.bind("<Button-1>", lambda e: self.handle_click())
+        self.video_canvas.bind("<Double-Button-1>", lambda e: self.handle_double_click())
 
     def setup_menu(self):
         self.menubar = Menu(self.root, bg=COLORS['menu_bg'], fg=COLORS['text'], 
@@ -427,6 +433,24 @@ class M3U8StreamingPlayer:
         self.root.after(1000, self.update_player_info)
 
     # ------------------------------------------------------------------
+    #  Click Handling
+    # ------------------------------------------------------------------
+    def handle_click(self, event=None):
+        if self.click_timer:
+            self.root.after_cancel(self.click_timer)
+        self.click_timer = self.root.after(300, self.perform_single_click)
+
+    def handle_double_click(self, event=None):
+        if self.click_timer:
+            self.root.after_cancel(self.click_timer)
+            self.click_timer = None
+        self.toggle_fullscreen()
+
+    def perform_single_click(self):
+        self.click_timer = None
+        self.toggle_play_pause()
+
+    # ------------------------------------------------------------------
     #  Fullscreen & Resize
     # ------------------------------------------------------------------
     def toggle_fullscreen(self):
@@ -445,6 +469,10 @@ class M3U8StreamingPlayer:
         # Hide menu
         self.root.config(menu='')
         
+        # Remove borders for clean look
+        self.video_frame.config(bd=0, relief=tk.FLAT)
+        self.video_frame.pack_configure(padx=0, pady=0)
+        
         # Set fullscreen
         self.root.attributes('-fullscreen', True)
         self.is_fullscreen = True
@@ -456,6 +484,10 @@ class M3U8StreamingPlayer:
     def exit_fullscreen(self):
         self.root.attributes('-fullscreen', False)
         self.is_fullscreen = False
+        
+        # Restore borders
+        self.video_frame.config(bd=2, relief=tk.SUNKEN)
+        self.video_frame.pack_configure(padx=4, pady=4)
         
         # Remove auto-hide bindings
         self.root.unbind('<Motion>')
