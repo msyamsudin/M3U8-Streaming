@@ -97,32 +97,65 @@ class M3U8StreamingPlayer:
         self.video_canvas.bind("<Double-Button-1>", lambda e: self.handle_double_click())
 
     def setup_menu(self):
-        self.menubar = Menu(self.root, bg=COLORS['menu_bg'], fg=COLORS['text'], 
-                      activebackground=COLORS['button_hover'], activeforeground=COLORS['text'],
-                      borderwidth=0, relief=tk.FLAT)
+        # Custom Menu Bar Container
+        self.menu_bar = tk.Frame(self.root, bg=COLORS['menu_bg'])
+        self.menu_bar.pack(side=tk.TOP, fill=tk.X)
         
-        # File menu
-        file_menu = Menu(self.menubar, tearoff=0, bg=COLORS['menu_bg'], fg=COLORS['text'])
+        # Left: Menu Buttons
+        self.menu_left = tk.Frame(self.menu_bar, bg=COLORS['menu_bg'])
+        self.menu_left.pack(side=tk.LEFT)
+        
+        # File Menu
+        self.file_btn = tk.Menubutton(self.menu_left, text="File", bg=COLORS['menu_bg'], fg=COLORS['text'],
+                                     activebackground=COLORS['button_hover'], activeforeground=COLORS['text'],
+                                     bd=0, relief=tk.FLAT, font=('Segoe UI', 9))
+        self.file_btn.pack(side=tk.LEFT, padx=2)
+        
+        file_menu = Menu(self.file_btn, tearoff=0, bg=COLORS['menu_bg'], fg=COLORS['text'])
         file_menu.add_command(label="Open URL... (Ctrl+O)", command=self.show_open_dialog)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.on_closing)
-        self.menubar.add_cascade(label="File", menu=file_menu)
+        self.file_btn.config(menu=file_menu)
         
-        # View menu
-        view_menu = Menu(self.menubar, tearoff=0, bg=COLORS['menu_bg'], fg=COLORS['text'])
+        # View Menu
+        self.view_btn = tk.Menubutton(self.menu_left, text="View", bg=COLORS['menu_bg'], fg=COLORS['text'],
+                                     activebackground=COLORS['button_hover'], activeforeground=COLORS['text'],
+                                     bd=0, relief=tk.FLAT, font=('Segoe UI', 9))
+        self.view_btn.pack(side=tk.LEFT, padx=2)
+        
+        view_menu = Menu(self.view_btn, tearoff=0, bg=COLORS['menu_bg'], fg=COLORS['text'])
         view_menu.add_command(label="Fullscreen (F)", command=self.toggle_fullscreen)
         self.always_on_top_var = tk.BooleanVar(value=False)
         view_menu.add_checkbutton(label="Always on Top", variable=self.always_on_top_var, command=self.toggle_always_on_top)
-        self.menubar.add_cascade(label="View", menu=view_menu)
+        self.view_btn.config(menu=view_menu)
 
-        # History menu
-        history_menu = Menu(self.menubar, tearoff=0, bg=COLORS['menu_bg'], fg=COLORS['text'])
+        # History Menu
+        self.history_btn = tk.Menubutton(self.menu_left, text="History", bg=COLORS['menu_bg'], fg=COLORS['text'],
+                                        activebackground=COLORS['button_hover'], activeforeground=COLORS['text'],
+                                        bd=0, relief=tk.FLAT, font=('Segoe UI', 9))
+        self.history_btn.pack(side=tk.LEFT, padx=2)
+        
+        history_menu = Menu(self.history_btn, tearoff=0, bg=COLORS['menu_bg'], fg=COLORS['text'])
         history_menu.add_checkbutton(label="Show History (H)", command=self.toggle_history)
         history_menu.add_separator()
         history_menu.add_command(label="Clear All History", command=self.clear_history)
-        self.menubar.add_cascade(label="History", menu=history_menu)
+        self.history_btn.config(menu=history_menu)
         
-        self.root.config(menu=self.menubar)
+        # Right: Status Indicators
+        self.menu_right = tk.Frame(self.menu_bar, bg=COLORS['menu_bg'])
+        self.menu_right.pack(side=tk.RIGHT, padx=10)
+        
+        # Speed Label (Now first/left)
+        self.speed_label = tk.Label(self.menu_right, text="", bg=COLORS['menu_bg'], 
+                                   fg='#00FF00', font=('Consolas', 9, 'bold'))
+        self.speed_label.pack(side=tk.LEFT, padx=(0, 5))
+
+        # Separator
+        tk.Label(self.menu_right, text="|", bg=COLORS['menu_bg'], fg=COLORS['text_gray'], font=('Segoe UI', 9)).pack(side=tk.LEFT, padx=5)
+
+        # Status Label (Now second/right)
+        self.status_label = tk.Label(self.menu_right, text="Ready", bg=COLORS['menu_bg'], fg=COLORS['text_gray'], font=('Segoe UI', 9))
+        self.status_label.pack(side=tk.LEFT)
 
     def setup_ui(self):
         # Main container (Horizontal for History Panel)
@@ -216,17 +249,16 @@ class M3U8StreamingPlayer:
         
         StyledButton(left, text="⛶", command=self.toggle_fullscreen, width=3).pack(side=tk.LEFT, padx=2)
         
-        # Center: Status & Quality
+        # Center: Quality Selector (Moved here from below)
         center = tk.Frame(ctrl_frame, bg=COLORS['control_bg'])
         center.pack(side=tk.LEFT, expand=True)
-        
-        self.status_label = tk.Label(center, text="Ready", bg=COLORS['control_bg'], fg=COLORS['text_gray'], font=('Segoe UI', 8))
-        self.status_label.pack()
         
         # Quality Selector (Hidden initially)
         self.quality_var = tk.StringVar()
         self.quality_combo = ttk.Combobox(center, textvariable=self.quality_var, state="readonly", width=15)
         self.quality_combo.bind("<<ComboboxSelected>>", self.on_quality_change)
+        
+
         
         # Right: Volume
         right = tk.Frame(ctrl_frame, bg=COLORS['control_bg'])
@@ -477,7 +509,22 @@ class M3U8StreamingPlayer:
                     # Save progress every 5 seconds approx (modulo check)
                     if int(cur) % 5 == 0:
                         update_history_progress(self.current_url, cur)
+                
+                # Update network speed indicator
+                cache_state = self.player.get_demuxer_cache_state()
+                if cache_state and isinstance(cache_state, dict):
+                    raw_rate = cache_state.get('raw-input-rate', 0)
+                    if raw_rate and raw_rate > 0:
+                        speed_text = self.format_speed(raw_rate)
+                        self.speed_label.config(text=f" {speed_text}")
+                    else:
+                        self.speed_label.config(text="")
+                else:
+                    self.speed_label.config(text="")
             except: pass
+        else:
+            # Hide speed indicator when not playing
+            self.speed_label.config(text="")
         self.root.after(1000, self.update_player_info)
 
     # ------------------------------------------------------------------
@@ -499,6 +546,13 @@ class M3U8StreamingPlayer:
         # Only toggle play/pause if user didn't drag
         if not self.is_dragging:
             self.toggle_play_pause()
+    
+    def format_speed(self, bytes_per_sec):
+        """Format network speed in KB/s or MB/s."""
+        if bytes_per_sec < 1024 * 1024:  # < 1 MB/s
+            return f"{bytes_per_sec / 1024:.1f} KB/s"
+        else:
+            return f"{bytes_per_sec / (1024 * 1024):.2f} MB/s"
 
     # ------------------------------------------------------------------
     #  Drag Window
@@ -568,7 +622,8 @@ class M3U8StreamingPlayer:
         self.controls_visible = False
         
         # Hide menu
-        self.root.config(menu='')
+        # Hide menu bar
+        self.menu_bar.pack_forget()
         
         # Remove borders for clean look
         self.video_frame.config(bd=0, relief=tk.FLAT)
@@ -606,7 +661,8 @@ class M3U8StreamingPlayer:
         self.root.config(cursor="")
         
         # Restore menu
-        self.root.config(menu=self.menubar)
+        # Restore menu bar
+        self.menu_bar.pack(side=tk.TOP, fill=tk.X, before=self.main_container)
         
         # Restore panels if they were enabled
         if self.show_config:

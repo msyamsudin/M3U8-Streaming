@@ -108,3 +108,12 @@ class MpvPlayer:
         """Set video track by ID."""
         if self.mpv:
             self.mpv.vid = track_id
+    
+    def get_demuxer_cache_state(self):
+        """Get demuxer cache state including network speed."""
+        if self.mpv:
+            try:
+                return self.mpv.demuxer_cache_state
+            except:
+                return None
+        return None
