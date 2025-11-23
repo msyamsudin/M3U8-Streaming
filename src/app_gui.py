@@ -35,6 +35,11 @@ class M3U8StreamingPlayer:
         self.hide_timer = None
         self.click_timer = None
         self.controls_visible = True
+        
+        # Drag state
+        self.drag_start_x = 0
+        self.drag_start_y = 0
+        self.is_dragging = False
 
         # Initialize UI
         self.setup_menu()
@@ -86,7 +91,9 @@ class M3U8StreamingPlayer:
         self.root.bind("<Configure>", self.on_window_resize)
         
         # Video Canvas Bindings
-        self.video_canvas.bind("<Button-1>", lambda e: self.handle_click())
+        self.video_canvas.bind("<Button-1>", self.start_drag)
+        self.video_canvas.bind("<B1-Motion>", self.do_drag)
+        self.video_canvas.bind("<ButtonRelease-1>", self.stop_drag)
         self.video_canvas.bind("<Double-Button-1>", lambda e: self.handle_double_click())
 
     def setup_menu(self):
@@ -489,7 +496,56 @@ class M3U8StreamingPlayer:
 
     def perform_single_click(self):
         self.click_timer = None
-        self.toggle_play_pause()
+        # Only toggle play/pause if user didn't drag
+        if not self.is_dragging:
+            self.toggle_play_pause()
+
+    # ------------------------------------------------------------------
+    #  Drag Window
+    # ------------------------------------------------------------------
+    def start_drag(self, event):
+        """Start window drag when user presses mouse button on video area."""
+        # Don't drag in fullscreen mode
+        if self.is_fullscreen:
+            self.handle_click()
+            return
+            
+        self.drag_start_x = event.x
+        self.drag_start_y = event.y
+        self.is_dragging = False  # Will be set to True if actual movement occurs
+        
+        # Still trigger click timer for single-click detection
+        self.handle_click()
+    
+    def do_drag(self, event):
+        """Perform window drag while mouse button is held and moved."""
+        # Don't drag in fullscreen mode
+        if self.is_fullscreen:
+            return
+            
+        # Calculate movement
+        delta_x = event.x - self.drag_start_x
+        delta_y = event.y - self.drag_start_y
+        
+        # If moved more than 5 pixels, consider it a drag (not a click)
+        if abs(delta_x) > 5 or abs(delta_y) > 5:
+            self.is_dragging = True
+            
+            # Get current window position
+            x = self.root.winfo_x() + delta_x
+            y = self.root.winfo_y() + delta_y
+            
+            # Move window
+            self.root.geometry(f"+{x}+{y}")
+    
+    def stop_drag(self, event):
+        """Stop window drag when user releases mouse button."""
+        # Don't process in fullscreen mode
+        if self.is_fullscreen:
+            return
+            
+        # Reset drag state after a short delay to allow click handler to check it
+        self.root.after(50, lambda: setattr(self, 'is_dragging', False))
 
     # ------------------------------------------------------------------
     #  Fullscreen & Resize
