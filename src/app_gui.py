@@ -237,7 +237,7 @@ class M3U8StreamingPlayer:
         
         # Seekbar
         seek_frame = tk.Frame(self.control_panel, bg=COLORS['control_bg'])
-        seek_frame.pack(fill=tk.X, padx=8, pady=(8, 4))
+        seek_frame.pack(fill=tk.X, padx=8, pady=(8, 1))
         
         self.time_label_left = tk.Label(seek_frame, text="00:00:00", bg=COLORS['control_bg'], fg=COLORS['text'], font=('Segoe UI', 8))
         self.time_label_left.pack(side=tk.LEFT, padx=(0, 8))
@@ -254,7 +254,7 @@ class M3U8StreamingPlayer:
         
         # Controls Row
         ctrl_frame = tk.Frame(self.control_panel, bg=COLORS['control_bg'])
-        ctrl_frame.pack(fill=tk.X, padx=8, pady=(4, 8))
+        ctrl_frame.pack(fill=tk.X, padx=8, pady=(1, 8))
         
         # Left: Playback
         left = tk.Frame(ctrl_frame, bg=COLORS['control_bg'])
@@ -284,16 +284,28 @@ class M3U8StreamingPlayer:
 
         
         # Right: Volume
-        right = tk.Frame(ctrl_frame, bg=COLORS['control_bg'])
-        right.pack(side=tk.RIGHT)
+        self.volume_frame = tk.Frame(ctrl_frame, bg=COLORS['control_bg'])
+        self.volume_frame.pack(side=tk.RIGHT)
         
-        self.mute_btn = StyledButton(right, text="🔊", command=self.toggle_mute, width=3)
+        self.mute_btn = StyledButton(self.volume_frame, text="🔊", command=self.toggle_mute, width=3)
         self.mute_btn.pack(side=tk.LEFT, padx=2)
         
         self.volume_var = tk.IntVar(value=100)
-        ttk.Scale(right, from_=0, to=100, orient=tk.HORIZONTAL, variable=self.volume_var, command=self.on_volume_change, length=80, style='MPC.Horizontal.TScale').pack(side=tk.LEFT, padx=5)
-        self.volume_label = tk.Label(right, text="100%", bg=COLORS['control_bg'], fg=COLORS['text'], font=('Segoe UI', 8), width=5)
-        self.volume_label.pack(side=tk.LEFT, padx=2)
+        self.volume_scale = ttk.Scale(self.volume_frame, from_=0, to=100, orient=tk.HORIZONTAL, variable=self.volume_var, command=self.on_volume_change, length=80, style='MPC.Horizontal.TScale')
+        # Initially hidden
+        
+        self.volume_label = tk.Label(self.volume_frame, text="100%", bg=COLORS['control_bg'], fg=COLORS['text'], font=('Segoe UI', 8), width=5)
+        # Initially hidden
+        # self.volume_label.pack(side=tk.LEFT, padx=2)
+
+        # Hover Bindings
+        self.volume_frame.bind('<Enter>', self.show_volume_slider)
+        self.volume_frame.bind('<Leave>', self.schedule_hide_volume)
+        self.mute_btn.bind('<Enter>', self.show_volume_slider)
+        self.volume_scale.bind('<Enter>', self.show_volume_slider)
+        self.volume_label.bind('<Enter>', self.show_volume_slider)
+        
+        self.volume_hide_timer = None
 
     # ------------------------------------------------------------------
     #  Logic
@@ -601,6 +613,26 @@ class M3U8StreamingPlayer:
             return f"{bytes_per_sec / 1024:.1f} KB/s"
         else:
             return f"{bytes_per_sec / (1024 * 1024):.2f} MB/s"
+
+    def show_volume_slider(self, event=None):
+        if self.volume_hide_timer:
+            self.root.after_cancel(self.volume_hide_timer)
+            self.volume_hide_timer = None
+            
+        if not self.volume_scale.winfo_ismapped():
+            self.mute_btn.pack_forget()
+            self.volume_scale.pack(side=tk.LEFT, padx=5)
+            self.volume_label.pack(side=tk.LEFT, padx=2)
+
+    def schedule_hide_volume(self, event=None):
+        if self.volume_hide_timer:
+            self.root.after_cancel(self.volume_hide_timer)
+        self.volume_hide_timer = self.root.after(500, self.hide_volume_slider)
+
+    def hide_volume_slider(self):
+        self.volume_scale.pack_forget()
+        self.volume_label.pack_forget()
+        self.mute_btn.pack(side=tk.LEFT, padx=2)
 
     # ------------------------------------------------------------------
     #  Drag Window
