@@ -356,7 +356,9 @@ class M3U8StreamingPlayer:
         ref = self.referer_entry.get().strip()
         ua = USER_AGENTS[self.ua_var.get()]
 
-        if not url: return
+        if not url:
+            messagebox.showwarning("Warning", "Please enter a valid URL")
+            return
         
         self.current_url = url
         self.status_label.config(text="Loading...", fg=COLORS['text'])
@@ -467,6 +469,10 @@ class M3U8StreamingPlayer:
             self.player.set_video_track(track_id)
 
     def toggle_play_pause(self):
+        if not self.current_url:
+            messagebox.showwarning("Warning", "Please load a URL first")
+            return
+
         if self.player and self.player.pause():
             self.play_btn.config(text="▶")
             self.status_label.config(text="Paused", fg='orange')
@@ -647,9 +653,7 @@ class M3U8StreamingPlayer:
         self.drag_start_x = event.x
         self.drag_start_y = event.y
         self.is_dragging = False  # Will be set to True if actual movement occurs
-        
-        # Still trigger click timer for single-click detection
-        self.handle_click()
+        self.possible_click = True # Assume it's a click until moved
     
     def do_drag(self, event):
         """Perform window drag while mouse button is held and moved."""
@@ -664,6 +668,7 @@ class M3U8StreamingPlayer:
         # If moved more than 5 pixels, consider it a drag (not a click)
         if abs(delta_x) > 5 or abs(delta_y) > 5:
             self.is_dragging = True
+            self.possible_click = False # It's definitely a drag now
             
             # Get current window position
             x = self.root.winfo_x() + delta_x
@@ -678,8 +683,13 @@ class M3U8StreamingPlayer:
         if self.is_fullscreen:
             return
             
-        # Reset drag state after a short delay to allow click handler to check it
-        self.root.after(50, lambda: setattr(self, 'is_dragging', False))
+        # If it was a possible click (didn't drag far enough), trigger click handler
+        if self.possible_click:
+            self.handle_click()
+            
+        # Reset drag state
+        self.is_dragging = False
+        self.possible_click = False
 
     # ------------------------------------------------------------------
     #  Fullscreen & Resize
