@@ -43,9 +43,9 @@ class M3U8StreamingPlayer:
         self.is_dragging = False
 
         # Initialize UI
+        self.setup_styles()
         self.setup_menu()
         self.setup_ui()
-        self.setup_styles()
         self.setup_bindings()
         
         # Initialize Player
@@ -72,11 +72,38 @@ class M3U8StreamingPlayer:
 
     def setup_styles(self):
         style = ttk.Style()
-        style.theme_use('winnative')
+        style.theme_use('clam')
         style.configure('MPC.Horizontal.TScale',
                        background=COLORS['toolbar_bg'],
                        troughcolor=COLORS['seekbar_bg'],
                        borderwidth=0)
+
+        # Combobox Style
+        style.map('TCombobox', fieldbackground=[('readonly', COLORS['entry_bg'])],
+                              selectbackground=[('readonly', COLORS['button_active']), ('!readonly', COLORS['button_active'])],
+                              selectforeground=[('readonly', COLORS['text']), ('!readonly', COLORS['text'])],
+                              background=[('readonly', COLORS['entry_bg'])],
+                              foreground=[('readonly', COLORS['entry_fg'])])
+        
+        style.configure('TCombobox', 
+                       fieldbackground=COLORS['entry_bg'],
+                       background=COLORS['button_bg'],
+                       foreground=COLORS['entry_fg'],
+                       arrowcolor=COLORS['text'],
+                       darkcolor=COLORS['bg'],
+                       lightcolor=COLORS['bg'],
+                       bordercolor=COLORS['border'])
+
+        # Combobox Popdown Styling
+        self.root.option_add('*TCombobox*Listbox.background', COLORS['entry_bg'])
+        self.root.option_add('*TCombobox*Listbox.foreground', COLORS['entry_fg'])
+        self.root.option_add('*TCombobox*Listbox.selectBackground', COLORS['button_active'])
+        self.root.option_add('*TCombobox*Listbox.selectForeground', COLORS['text'])
+        self.root.option_add('*TCombobox*Listbox.font', ('Segoe UI', 9))
+
+        # Global Selection Styling
+        self.root.option_add('*selectBackground', COLORS['button_active'])
+        self.root.option_add('*selectForeground', COLORS['text'])
 
     def setup_bindings(self):
         self.root.bind("<f>", lambda e: self.toggle_fullscreen())

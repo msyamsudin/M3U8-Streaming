@@ -106,8 +106,10 @@ class LoadingSpinner:
             self._create_window()
             self._animate()
             
-            # Bind to master move/resize to update position
-            self.bind_id = self.master.bind('<Configure>', self._update_position, add="+")
+            # Bind to master events
+            self.bind_id_config = self.master.bind('<Configure>', self._update_position, add="+")
+            self.bind_id_map = self.master.bind('<Map>', self._on_master_map, add="+")
+            self.bind_id_unmap = self.master.bind('<Unmap>', self._on_master_unmap, add="+")
 
     def stop(self):
         self.is_spinning = False
@@ -120,17 +122,20 @@ class LoadingSpinner:
             self.window = None
             
         # Unbind
-        if hasattr(self, 'bind_id'):
-            try:
-                self.master.unbind('<Configure>', self.bind_id)
-            except: pass
+        for attr in ['bind_id_config', 'bind_id_map', 'bind_id_unmap']:
+            if hasattr(self, attr):
+                try:
+                    event = {'bind_id_config': '<Configure>', 'bind_id_map': '<Map>', 'bind_id_unmap': '<Unmap>'}[attr]
+                    self.master.unbind(event, getattr(self, attr))
+                except: pass
 
     def _create_window(self):
         if self.window: return
         
         self.window = tk.Toplevel(self.master)
         self.window.overrideredirect(True)
-        self.window.attributes('-topmost', True)
+        # Remove global topmost, use transient to keep above master but below other apps
+        self.window.transient(self.master)
         
         # Set transparency
         try:
@@ -146,13 +151,26 @@ class LoadingSpinner:
         
         self._update_position()
 
+    def _on_master_map(self, event):
+        if self.window:
+            self.window.deiconify()
+            self._update_position()
+
+    def _on_master_unmap(self, event):
+        if self.window:
+            self.window.withdraw()
+
     def _update_position(self, event=None):
         if not self.window or not self.is_spinning: return
         
         # Calculate center of master
         try:
             # Ensure master is mapped
-            if not self.master.winfo_ismapped(): return
+            if not self.master.winfo_ismapped(): 
+                self.window.withdraw()
+                return
+            
+            self.window.deiconify()
             
             mw = self.master.winfo_width()
             mh = self.master.winfo_height()
@@ -163,6 +181,7 @@ class LoadingSpinner:
             y = my + (mh - self.size) // 2
             
             self.window.geometry(f"{self.size}x{self.size}+{x}+{y}")
+            # Lift above master, but don't force global topmost
             self.window.lift()
         except: pass
 
