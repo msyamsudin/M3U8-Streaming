@@ -403,6 +403,12 @@ class M3U8StreamingPlayer:
                     else:
                         self.root.after(0, self.spinner.stop)
                 
+                @self.player.mpv.property_observer('eof-reached')
+                def on_eof_reached(name, value):
+                    if self.is_closing: return
+                    if value:
+                        self.root.after(0, self.stop_stream)
+                
         except Exception as e:
             self.root.after(0, lambda: messagebox.showerror("Error", str(e)))
 
