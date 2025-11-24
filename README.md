@@ -8,7 +8,11 @@ Pemutar streaming berbasis **HLS (.m3u8)** dengan dukungan **rekaman siaran lang
 
 ---
 
-<img width="1252" height="854" alt="image" src="https://github.com/user-attachments/assets/d619ce49-8994-48aa-a50b-09a94d6762d3" />
+<img width="1315" height="916" alt="image" src="https://github.com/user-attachments/assets/fd30c7ea-b919-4af3-972f-ceac52ca7a44" />
+
+---
+
+<img width="1315" height="916" alt="image" src="https://github.com/user-attachments/assets/c3d3657d-cb5d-401e-b9d1-12cae2b2ef61" />
 
 ---
 
