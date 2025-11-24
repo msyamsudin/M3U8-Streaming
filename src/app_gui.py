@@ -157,17 +157,7 @@ class M3U8StreamingPlayer:
         view_menu.add_checkbutton(label="Always on Top", variable=self.always_on_top_var, command=self.toggle_always_on_top)
         self.view_btn.config(menu=view_menu)
 
-        # History Menu
-        self.history_btn = tk.Menubutton(self.menu_left, text="History", bg=COLORS['menu_bg'], fg=COLORS['text'],
-                                        activebackground=COLORS['button_hover'], activeforeground=COLORS['text'],
-                                        bd=0, relief=tk.FLAT, font=('Segoe UI', 9))
-        self.history_btn.pack(side=tk.LEFT, padx=2)
-        
-        history_menu = Menu(self.history_btn, tearoff=0, bg=COLORS['menu_bg'], fg=COLORS['text'])
-        history_menu.add_checkbutton(label="Show History (H)", command=self.toggle_history)
-        history_menu.add_separator()
-        history_menu.add_command(label="Clear All History", command=self.clear_history)
-        self.history_btn.config(menu=history_menu)
+
         
         # Right: Status Indicators
         self.menu_right = tk.Frame(self.menu_bar, bg=COLORS['menu_bg'])
@@ -260,6 +250,8 @@ class M3U8StreamingPlayer:
         self.time_label_right = tk.Label(seek_frame, text="00:00:00", bg=COLORS['control_bg'], fg=COLORS['text'], font=('Segoe UI', 8))
         self.time_label_right.pack(side=tk.LEFT, padx=(8, 0))
         
+        StyledButton(seek_frame, text="⛶", command=self.toggle_fullscreen, width=2, padx=2, pady=2).pack(side=tk.LEFT, padx=(8, 0))
+        
         # Controls Row
         ctrl_frame = tk.Frame(self.control_panel, bg=COLORS['control_bg'])
         ctrl_frame.pack(fill=tk.X, padx=8, pady=(4, 8))
@@ -278,7 +270,7 @@ class M3U8StreamingPlayer:
         self.record_btn = StyledButton(left, text="● Rec", command=self.toggle_recording)
         self.record_btn.pack(side=tk.LEFT, padx=2)
         
-        StyledButton(left, text="⛶", command=self.toggle_fullscreen, width=3).pack(side=tk.LEFT, padx=2)
+        StyledButton(left, text="History", command=self.toggle_history).pack(side=tk.LEFT, padx=2)
         
         # Center: Quality Selector (Moved here from below)
         center = tk.Frame(ctrl_frame, bg=COLORS['control_bg'])
