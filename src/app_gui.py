@@ -288,7 +288,7 @@ class M3U8StreamingPlayer:
         self.volume_frame.pack(side=tk.RIGHT)
         
         self.mute_btn = StyledButton(self.volume_frame, text="🔊", command=self.toggle_mute, width=3)
-        self.mute_btn.pack(side=tk.LEFT, padx=2)
+        self.mute_btn.pack(side=tk.LEFT, padx=(2, 0))
         
         self.volume_var = tk.IntVar(value=100)
         self.volume_scale = ttk.Scale(self.volume_frame, from_=0, to=100, orient=tk.HORIZONTAL, variable=self.volume_var, command=self.on_volume_change, length=80, style='MPC.Horizontal.TScale')
@@ -622,7 +622,7 @@ class M3U8StreamingPlayer:
         if not self.volume_scale.winfo_ismapped():
             self.mute_btn.pack_forget()
             self.volume_scale.pack(side=tk.LEFT, padx=5)
-            self.volume_label.pack(side=tk.LEFT, padx=2)
+            self.volume_label.pack(side=tk.LEFT, padx=(2, 0))
 
     def schedule_hide_volume(self, event=None):
         if self.volume_hide_timer:
@@ -632,7 +632,7 @@ class M3U8StreamingPlayer:
     def hide_volume_slider(self):
         self.volume_scale.pack_forget()
         self.volume_label.pack_forget()
-        self.mute_btn.pack(side=tk.LEFT, padx=2)
+        self.mute_btn.pack(side=tk.LEFT, padx=(2, 0))
 
     # ------------------------------------------------------------------
     #  Drag Window

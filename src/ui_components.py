@@ -48,6 +48,7 @@ class HistoryPanel(tk.Frame):
         
         self.listbox.bind('<Double-Button-1>', self._on_double_click)
         self.listbox.bind('<Return>', self._on_double_click)
+        self.listbox.bind('<Delete>', self._on_delete_btn)
         
         # Buttons
         btn_frame = tk.Frame(self, bg=COLORS['bg'])
@@ -74,7 +75,7 @@ class HistoryPanel(tk.Frame):
                 url = self.history_data[index]['url']
                 self.on_play_callback(url)
 
-    def _on_delete_btn(self):
+    def _on_delete_btn(self, event=None):
         selection = self.listbox.curselection()
         if selection:
             index = selection[0]
