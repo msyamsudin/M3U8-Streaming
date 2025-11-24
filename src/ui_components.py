@@ -82,3 +82,101 @@ class HistoryPanel(tk.Frame):
 
     def _on_clear_btn(self):
         self.on_clear_callback()
+
+import math
+
+class LoadingSpinner:
+    def __init__(self, master, size=50, color='#00FF00', bg_color=None, **kwargs):
+        self.master = master
+        self.size = size
+        self.color = color
+        self.is_spinning = False
+        self.timer_id = None
+        self.window = None
+        self.canvas = None
+        self.arc = None
+        self.angle = 0
+        
+        # Transparency key
+        self.trans_color = '#ff00ff' # Magenta
+
+    def start(self):
+        if not self.is_spinning:
+            self.is_spinning = True
+            self._create_window()
+            self._animate()
+            
+            # Bind to master move/resize to update position
+            self.bind_id = self.master.bind('<Configure>', self._update_position, add="+")
+
+    def stop(self):
+        self.is_spinning = False
+        if self.timer_id:
+            self.master.after_cancel(self.timer_id)
+            self.timer_id = None
+        
+        if self.window:
+            self.window.destroy()
+            self.window = None
+            
+        # Unbind
+        if hasattr(self, 'bind_id'):
+            try:
+                self.master.unbind('<Configure>', self.bind_id)
+            except: pass
+
+    def _create_window(self):
+        if self.window: return
+        
+        self.window = tk.Toplevel(self.master)
+        self.window.overrideredirect(True)
+        self.window.attributes('-topmost', True)
+        
+        # Set transparency
+        try:
+            self.window.wm_attributes('-transparentcolor', self.trans_color)
+        except:
+            pass # Not supported on all OS
+            
+        self.window.config(bg=self.trans_color)
+        
+        self.canvas = tk.Canvas(self.window, width=self.size, height=self.size, 
+                                bg=self.trans_color, highlightthickness=0)
+        self.canvas.pack()
+        
+        self._update_position()
+
+    def _update_position(self, event=None):
+        if not self.window or not self.is_spinning: return
+        
+        # Calculate center of master
+        try:
+            # Ensure master is mapped
+            if not self.master.winfo_ismapped(): return
+            
+            mw = self.master.winfo_width()
+            mh = self.master.winfo_height()
+            mx = self.master.winfo_rootx()
+            my = self.master.winfo_rooty()
+            
+            x = mx + (mw - self.size) // 2
+            y = my + (mh - self.size) // 2
+            
+            self.window.geometry(f"{self.size}x{self.size}+{x}+{y}")
+            self.window.lift()
+        except: pass
+
+    def _animate(self):
+        if self.is_spinning and self.window and self.canvas:
+            self.angle = (self.angle - 10) % 360
+            
+            if self.arc:
+                self.canvas.delete(self.arc)
+                
+            self.arc = self.canvas.create_arc(
+                4, 4, self.size-4, self.size-4,
+                start=self.angle, extent=120,
+                style=tk.ARC, width=4, outline=self.color
+            )
+            
+            self.timer_id = self.master.after(30, self._animate)

@@ -7,7 +7,7 @@ from datetime import datetime
 
 from .config import COLORS, USER_AGENTS
 from .player_core import MpvPlayer
-from .ui_components import StyledButton, HistoryPanel
+from .ui_components import StyledButton, HistoryPanel, LoadingSpinner
 from .utils import format_time, load_history, save_history, get_unique_filename, write_history, update_history_progress, get_history_item
 
 class M3U8StreamingPlayer:
@@ -27,6 +27,7 @@ class M3U8StreamingPlayer:
         self.show_history = False
         self.current_url = ""
         self.previous_volume = 100
+        self.is_closing = False
         
         # Fullscreen state
         self.normal_geometry = None
@@ -178,6 +179,9 @@ class M3U8StreamingPlayer:
         self.video_canvas = tk.Frame(self.video_frame, bg=COLORS['video_bg'])
         self.video_canvas.pack(fill=tk.BOTH, expand=True)
         
+        # Loading Spinner (Overlay)
+        self.spinner = LoadingSpinner(self.video_frame, size=60, color='#00FF00', bg_color=COLORS['video_bg'])
+        
         # Control Panel
         self.setup_control_panel()
 
@@ -325,6 +329,7 @@ class M3U8StreamingPlayer:
         
         self.current_url = url
         self.status_label.config(text="Loading...", fg=COLORS['text'])
+        self.spinner.start()
         
         # Save to history
         save_history(url)
@@ -353,6 +358,23 @@ class M3U8StreamingPlayer:
                 
                 self.is_playing = True
                 self.root.after(0, self._on_play_start)
+                
+                # Observe buffering
+                @self.player.mpv.property_observer('core-idle')
+                def on_core_idle(name, value):
+                    if self.is_closing: return
+                    if value:
+                        self.root.after(0, self.spinner.start)
+                    else:
+                        self.root.after(0, self.spinner.stop)
+                        
+                @self.player.mpv.property_observer('paused-for-cache')
+                def on_paused_for_cache(name, value):
+                    if self.is_closing: return
+                    if value:
+                        self.root.after(0, self.spinner.start)
+                    else:
+                        self.root.after(0, self.spinner.stop)
                 
         except Exception as e:
             self.root.after(0, lambda: messagebox.showerror("Error", str(e)))
@@ -421,6 +443,7 @@ class M3U8StreamingPlayer:
             self.is_playing = False
             self.play_btn.config(text="▶")
             self.status_label.config(text="Stopped", fg='red')
+            self.spinner.stop()
             
             # Save progress before stopping
             try:
@@ -714,6 +737,9 @@ class M3U8StreamingPlayer:
         pass
 
     def on_closing(self):
+        self.is_closing = True
+        self.spinner.stop()
+        
         if self.player:
             # Save final progress
             try:
