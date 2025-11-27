@@ -7,7 +7,7 @@ from datetime import datetime
 
 from .config import COLORS, USER_AGENTS
 from .player_core import MpvPlayer
-from .ui_components import StyledButton, HistoryPanel, LoadingSpinner
+from .ui_components import StyledButton, HistoryPanel, LoadingSpinner, BufferedScale
 from .utils import format_time, load_history, save_history, get_unique_filename, write_history, update_history_progress, get_history_item
 
 class M3U8StreamingPlayer:
@@ -242,10 +242,8 @@ class M3U8StreamingPlayer:
         self.time_label_left = tk.Label(seek_frame, text="00:00:00", bg=COLORS['control_bg'], fg=COLORS['text'], font=('Segoe UI', 8))
         self.time_label_left.pack(side=tk.LEFT, padx=(0, 8))
         
-        self.progress_var = tk.DoubleVar()
-        self.progress_scale = ttk.Scale(seek_frame, from_=0, to=100, orient=tk.HORIZONTAL, variable=self.progress_var, command=self.on_seek_move, style='MPC.Horizontal.TScale')
+        self.progress_scale = BufferedScale(seek_frame, command=self.on_seek_end)
         self.progress_scale.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self.progress_scale.bind("<ButtonRelease-1>", self.on_seek_end)
         
         self.time_label_right = tk.Label(seek_frame, text="00:00:00", bg=COLORS['control_bg'], fg=COLORS['text'], font=('Segoe UI', 8))
         self.time_label_right.pack(side=tk.LEFT, padx=(8, 0))
@@ -396,7 +394,9 @@ class M3U8StreamingPlayer:
                 @self.player.mpv.property_observer('core-idle')
                 def on_core_idle(name, value):
                     if self.is_closing: return
-                    if value:
+                    # Only show spinner if not manually paused
+                    is_paused = self.player.mpv.pause if self.player and self.player.mpv else False
+                    if value and not is_paused:
                         self.root.after(0, self.spinner.start)
                     else:
                         self.root.after(0, self.spinner.stop)
@@ -404,7 +404,9 @@ class M3U8StreamingPlayer:
                 @self.player.mpv.property_observer('paused-for-cache')
                 def on_paused_for_cache(name, value):
                     if self.is_closing: return
-                    if value:
+                    # Only show spinner if not manually paused
+                    is_paused = self.player.mpv.pause if self.player and self.player.mpv else False
+                    if value and not is_paused:
                         self.root.after(0, self.spinner.start)
                     else:
                         self.root.after(0, self.spinner.stop)
@@ -476,6 +478,7 @@ class M3U8StreamingPlayer:
         if self.player and self.player.pause():
             self.play_btn.config(text="▶")
             self.status_label.config(text="Paused", fg='orange')
+            self.spinner.stop() # Ensure spinner is hidden when paused
         else:
             self.play_btn.config(text="⏸")
             self.status_label.config(text="Playing", fg='green')
@@ -495,7 +498,9 @@ class M3U8StreamingPlayer:
             except: pass
             
             self.time_label_left.config(text="00:00:00")
-            self.progress_var.set(0)
+            self.time_label_left.config(text="00:00:00")
+            self.progress_scale.set_progress(0)
+            self.progress_scale.set_buffer(0)
             
             if self.is_recording:
                 self.toggle_recording()
@@ -527,20 +532,18 @@ class M3U8StreamingPlayer:
         if self.player: self.player.seek(seconds)
 
     def on_seek_move(self, value):
-        self.is_seeking = True
+        # This is now handled internally by BufferedScale, but we might want to update the time label
+        # BufferedScale doesn't emit continuous events by default in my implementation above, 
+        # but let's assume we want to support it if we modify BufferedScale later.
+        # For now, this method might not be called directly by the new widget unless we bind it.
+        pass
+
+    def on_seek_end(self, value):
         if self.player:
             dur = self.player.get_duration()
             if dur:
-                # Update time label with preview
-                t = (float(value) / 100.0) * dur
-                self.time_label_left.config(text=format_time(t))
-    def on_seek_end(self, _):
-        if self.player:
-            dur = self.player.get_duration()
-            if dur:
-                t = (self.progress_var.get() / 100.0) * dur
+                t = (value / 100.0) * dur
                 self.player.seek(t, "absolute")
-        self.is_seeking = False
 
     def toggle_mute(self):
         if not self.player: return
@@ -570,7 +573,14 @@ class M3U8StreamingPlayer:
                 if cur is not None and dur and not self.is_seeking:
                     self.time_label_left.config(text=format_time(cur))
                     self.time_label_right.config(text=format_time(dur))
-                    self.progress_var.set((cur / dur) * 100)
+                    self.time_label_left.config(text=format_time(cur))
+                    self.time_label_right.config(text=format_time(dur))
+                    self.progress_scale.set_progress((cur / dur) * 100)
+                    
+                    # Update buffer
+                    buf = self.player.get_buffered_time()
+                    if buf:
+                        self.progress_scale.set_buffer((buf / dur) * 100)
                     
                     # Save progress every 5 seconds approx (modulo check)
                     if int(cur) % 5 == 0:

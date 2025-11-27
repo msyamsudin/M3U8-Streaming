@@ -1,202 +1,238 @@
 import tkinter as tk
-from tkinter import ttk
 from .config import COLORS
 
 class StyledButton(tk.Button):
     def __init__(self, master, **kwargs):
-        config = {
-            'bg': COLORS['button_bg'],
-            'fg': COLORS['text'],
-            'relief': tk.FLAT,
-            'bd': 0,
-            'padx': 12,
-            'pady': 6,
-            'cursor': 'hand2',
-            'font': ('Segoe UI', 9),
-            'activebackground': COLORS['button_hover'],
-            'activeforeground': COLORS['text']
-        }
-        config.update(kwargs)
-        super().__init__(master, **config)
+        super().__init__(master, **kwargs)
+        self.config(
+            bg=COLORS['button_bg'],
+            fg=COLORS['text'],
+            activebackground=COLORS['button_active'],
+            activeforeground=COLORS['text'],
+            relief=tk.FLAT,
+            bd=0,
+            cursor='hand2'
+        )
+        self.bind('<Enter>', self.on_enter)
+        self.bind('<Leave>', self.on_leave)
+
+    def on_enter(self, e):
+        if self['state'] != 'disabled':
+            self['bg'] = COLORS['button_hover']
+
+    def on_leave(self, e):
+        if self['state'] != 'disabled':
+            self['bg'] = COLORS['button_bg']
 
 class HistoryPanel(tk.Frame):
-    def __init__(self, master, on_play_callback, on_delete_callback, on_clear_callback, **kwargs):
-        super().__init__(master, bg=COLORS['bg'], **kwargs)
-        self.on_play_callback = on_play_callback
-        self.on_delete_callback = on_delete_callback
-        self.on_clear_callback = on_clear_callback
+    def __init__(self, master, load_callback, delete_callback, clear_callback):
+        super().__init__(master, bg=COLORS['bg'])
+        self.load_callback = load_callback
+        self.delete_callback = delete_callback
+        self.clear_callback = clear_callback
         
         # Header
-        header = tk.Frame(self, bg=COLORS['menu_bg'])
+        header = tk.Frame(self, bg=COLORS['header_bg'])
         header.pack(fill=tk.X)
-        tk.Label(header, text="History", bg=COLORS['menu_bg'], fg=COLORS['text'],
-                 font=('Segoe UI', 10, 'bold')).pack(side=tk.LEFT, padx=10, pady=5)
         
-        # Listbox with scrollbar
+        tk.Label(header, text="History", bg=COLORS['header_bg'], fg=COLORS['text'], font=('Segoe UI', 10, 'bold')).pack(side=tk.LEFT, padx=5, pady=2)
+        
+        StyledButton(header, text="Clear All", command=self.clear_callback, font=('Segoe UI', 8)).pack(side=tk.RIGHT, padx=5, pady=2)
+        
+        # Listbox with Scrollbar
         list_frame = tk.Frame(self, bg=COLORS['bg'])
         list_frame.pack(fill=tk.BOTH, expand=True)
         
-        self.listbox = tk.Listbox(list_frame, bg=COLORS['entry_bg'], fg=COLORS['text'],
-                                  selectbackground=COLORS['button_active'],
-                                  selectforeground=COLORS['text'],
-                                  relief=tk.FLAT, bd=0, highlightthickness=0)
-        self.listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5,0), pady=5)
+        self.scrollbar = tk.Scrollbar(list_frame)
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.listbox.yview)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y, pady=5)
-        self.listbox.config(yscrollcommand=scrollbar.set)
+        self.listbox = tk.Listbox(list_frame, bg=COLORS['list_bg'], fg=COLORS['text'],
+                                 selectbackground=COLORS['button_active'], selectforeground=COLORS['text'],
+                                 relief=tk.FLAT, bd=0, yscrollcommand=self.scrollbar.set,
+                                 font=('Segoe UI', 9))
+        self.listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.scrollbar.config(command=self.listbox.yview)
         
-        self.listbox.bind('<Double-Button-1>', self._on_double_click)
-        self.listbox.bind('<Return>', self._on_double_click)
-        self.listbox.bind('<Delete>', self._on_delete_btn)
+        # Bindings
+        self.listbox.bind('<Double-Button-1>', self.on_double_click)
+        self.listbox.bind('<Delete>', self.on_delete_key)
         
-        # Buttons
-        btn_frame = tk.Frame(self, bg=COLORS['bg'])
-        btn_frame.pack(fill=tk.X, pady=5, padx=5)
-        
-        StyledButton(btn_frame, text="Delete", command=self._on_delete_btn).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 2))
-        StyledButton(btn_frame, text="Clear All", command=self._on_clear_btn).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(2, 0))
-        
-        self.history_data = []
-
-    def update_history(self, history_list):
-        self.history_data = history_list
+    def update_history(self, history_items):
         self.listbox.delete(0, tk.END)
-        for item in history_list:
-            # Display name if available, else URL
-            display = item.get('name') or item.get('url')
-            self.listbox.insert(tk.END, f"• {display}")
+        for item in history_items:
+            name = item.get('title') or item['url']
+            if len(name) > 80: name = name[:77] + "..."
+            self.listbox.insert(tk.END, f" {name}")
+            
+    def on_double_click(self, event):
+        selection = self.listbox.curselection()
+        if selection:
+            # Get full URL from history data (not just the display text)
+            # This requires the parent to handle the mapping, but for now we assume the index matches
+            # A better way is to pass the full history list to this component
+            from .utils import load_history # Import here to avoid circular dependency if possible, or pass data
+            history = load_history()
+            if 0 <= selection[0] < len(history):
+                url = history[selection[0]]['url']
+                self.load_callback(url)
 
-    def _on_double_click(self, event):
+    def on_delete_key(self, event):
         selection = self.listbox.curselection()
         if selection:
             index = selection[0]
-            if index < len(self.history_data):
-                url = self.history_data[index]['url']
-                self.on_play_callback(url)
-
-    def _on_delete_btn(self, event=None):
-        selection = self.listbox.curselection()
-        if selection:
-            index = selection[0]
-            self.on_delete_callback(index)
-
-    def _on_clear_btn(self):
-        self.on_clear_callback()
-
-import math
+            self.delete_callback(index)
 
 class LoadingSpinner:
-    def __init__(self, master, size=50, color='#00FF00', bg_color=None, **kwargs):
-        self.master = master
+    def __init__(self, parent, size=50, color="white", bg_color="black"):
+        self.parent = parent
         self.size = size
         self.color = color
-        self.is_spinning = False
-        self.timer_id = None
+        self.bg_color = bg_color # Kept for compatibility, but we'll use a chroma key
         self.window = None
         self.canvas = None
-        self.arc = None
         self.angle = 0
+        self.is_spinning = False
+        self.timer_id = None
+        self.chroma_key = "#add123" # Distinct color for transparency
+
+    def draw(self):
+        if not self.canvas: return
         
-        # Transparency key
-        self.trans_color = '#ff00ff' # Magenta
+        self.canvas.delete("all")
+        w = self.size
+        h = self.size
+        
+        start = self.angle
+        extent = 60
+        
+        # Draw arcs with thicker width
+        self.canvas.create_arc(5, 5, w-5, h-5, start=start, extent=extent, 
+                              outline=self.color, width=4, style="arc")
+        self.canvas.create_arc(5, 5, w-5, h-5, start=start+180, extent=extent, 
+                              outline=self.color, width=4, style="arc")
+
+    def spin(self):
+        if self.is_spinning and self.canvas:
+            self.angle = (self.angle + 20) % 360
+            self.draw()
+            self.timer_id = self.parent.after(50, self.spin)
 
     def start(self):
         if not self.is_spinning:
             self.is_spinning = True
-            self._create_window()
-            self._animate()
             
-            # Bind to master events
-            self.bind_id_config = self.master.bind('<Configure>', self._update_position, add="+")
-            self.bind_id_map = self.master.bind('<Map>', self._on_master_map, add="+")
-            self.bind_id_unmap = self.master.bind('<Unmap>', self._on_master_unmap, add="+")
+            # Create Toplevel for transparency
+            self.window = tk.Toplevel(self.parent)
+            self.window.overrideredirect(True)
+            self.window.attributes('-topmost', True)
+            
+            # Set transparency
+            try:
+                self.window.config(bg=self.chroma_key)
+                self.window.wm_attributes('-transparentcolor', self.chroma_key)
+            except:
+                # Fallback for non-Windows or if transparency fails
+                self.window.config(bg=self.bg_color)
+            
+            # Calculate position (Center of parent)
+            self.update_position()
+            
+            # Bind to parent configure to update position
+            self.parent.bind('<Configure>', self.update_position, add="+")
+            
+            self.canvas = tk.Canvas(self.window, width=self.size, height=self.size, 
+                                   bg=self.chroma_key, highlightthickness=0)
+            self.canvas.pack(fill=tk.BOTH, expand=True)
+            
+            self.spin()
+
+    def update_position(self, event=None):
+        if self.window and self.parent.winfo_exists():
+            try:
+                x = self.parent.winfo_rootx() + (self.parent.winfo_width() // 2) - (self.size // 2)
+                y = self.parent.winfo_rooty() + (self.parent.winfo_height() // 2) - (self.size // 2)
+                self.window.geometry(f"+{x}+{y}")
+                self.window.lift()
+            except: pass
 
     def stop(self):
         self.is_spinning = False
         if self.timer_id:
-            self.master.after_cancel(self.timer_id)
+            self.parent.after_cancel(self.timer_id)
             self.timer_id = None
         
         if self.window:
             self.window.destroy()
             self.window = None
-            
-        # Unbind
-        for attr in ['bind_id_config', 'bind_id_map', 'bind_id_unmap']:
-            if hasattr(self, attr):
-                try:
-                    event = {'bind_id_config': '<Configure>', 'bind_id_map': '<Map>', 'bind_id_unmap': '<Unmap>'}[attr]
-                    self.master.unbind(event, getattr(self, attr))
-                except: pass
+            self.canvas = None
+            # Unbind is tricky because we used add="+", but since we destroy the window, 
+            # the update_position check for self.window will fail gracefully.
+            # Ideally we should unbind, but Tkinter doesn't make it easy to unbind specific functions.
 
-    def _create_window(self):
-        if self.window: return
+class BufferedScale(tk.Canvas):
+    def __init__(self, master, command=None, **kwargs):
+        super().__init__(master, **kwargs)
+        self.command = command
+        self.progress = 0.0  # 0 to 100
+        self.buffer = 0.0    # 0 to 100
         
-        self.window = tk.Toplevel(self.master)
-        self.window.overrideredirect(True)
-        # Remove global topmost, use transient to keep above master but below other apps
-        self.window.transient(self.master)
+        self.config(bg=COLORS['control_bg'], highlightthickness=0, height=15)
+        self.bind('<Configure>', self.draw)
+        self.bind('<Button-1>', self.on_click)
+        self.bind('<B1-Motion>', self.on_drag)
+        self.bind('<ButtonRelease-1>', self.on_release)
         
-        # Set transparency
-        try:
-            self.window.wm_attributes('-transparentcolor', self.trans_color)
-        except:
-            pass # Not supported on all OS
-            
-        self.window.config(bg=self.trans_color)
-        
-        self.canvas = tk.Canvas(self.window, width=self.size, height=self.size, 
-                                bg=self.trans_color, highlightthickness=0)
-        self.canvas.pack()
-        
-        self._update_position()
+        self.is_dragging = False
 
-    def _on_master_map(self, event):
-        if self.window:
-            self.window.deiconify()
-            self._update_position()
+    def set_progress(self, value):
+        if not self.is_dragging:
+            self.progress = max(0, min(100, value))
+            self.draw()
 
-    def _on_master_unmap(self, event):
-        if self.window:
-            self.window.withdraw()
+    def set_buffer(self, value):
+        self.buffer = max(0, min(100, value))
+        self.draw()
 
-    def _update_position(self, event=None):
-        if not self.window or not self.is_spinning: return
+    def draw(self, event=None):
+        self.delete("all")
+        w = self.winfo_width()
+        h = self.winfo_height()
+        cy = h / 2
         
-        # Calculate center of master
-        try:
-            # Ensure master is mapped
-            if not self.master.winfo_ismapped(): 
-                self.window.withdraw()
-                return
+        # Background track
+        self.create_rectangle(0, cy-2, w, cy+2, fill=COLORS['seekbar_bg'], outline="")
+        
+        # Buffer track
+        if self.buffer > 0:
+            bw = (self.buffer / 100) * w
+            self.create_rectangle(0, cy-2, bw, cy+2, fill=COLORS['text_gray'], outline="")
             
-            self.window.deiconify()
+        # Progress track
+        if self.progress > 0:
+            pw = (self.progress / 100) * w
+            self.create_rectangle(0, cy-2, pw, cy+2, fill=COLORS['accent'], outline="")
             
-            mw = self.master.winfo_width()
-            mh = self.master.winfo_height()
-            mx = self.master.winfo_rootx()
-            my = self.master.winfo_rooty()
-            
-            x = mx + (mw - self.size) // 2
-            y = my + (mh - self.size) // 2
-            
-            self.window.geometry(f"{self.size}x{self.size}+{x}+{y}")
-            # Lift above master, but don't force global topmost
-            self.window.lift()
-        except: pass
+            # Thumb
+            self.create_oval(pw-6, cy-6, pw+6, cy+6, fill=COLORS['text'], outline=COLORS['accent'])
 
-    def _animate(self):
-        if self.is_spinning and self.window and self.canvas:
-            self.angle = (self.angle - 10) % 360
-            
-            if self.arc:
-                self.canvas.delete(self.arc)
-                
-            self.arc = self.canvas.create_arc(
-                4, 4, self.size-4, self.size-4,
-                start=self.angle, extent=120,
-                style=tk.ARC, width=4, outline=self.color
-            )
-            
-            self.timer_id = self.master.after(30, self._animate)
+    def on_click(self, event):
+        self.is_dragging = True
+        self.update_from_event(event)
+
+    def on_drag(self, event):
+        if self.is_dragging:
+            self.update_from_event(event)
+
+    def on_release(self, event):
+        self.is_dragging = False
+        if self.command:
+            self.command(self.progress)
+
+    def update_from_event(self, event):
+        w = self.winfo_width()
+        if w > 0:
+            x = max(0, min(w, event.x))
+            self.progress = (x / w) * 100
+            self.draw()
+            # Optional: Call command while dragging for live seek
+            # if self.command: self.command(self.progress)

@@ -117,3 +117,13 @@ class MpvPlayer:
             except:
                 return None
         return None
+
+    def get_buffered_time(self):
+        """Get the buffered time position."""
+        if self.mpv:
+            try:
+                # demuxer-cache-time returns the timestamp of the last buffered packet
+                return self.mpv.demuxer_cache_time
+            except:
+                return None
+        return None

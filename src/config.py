@@ -34,6 +34,9 @@ COLORS = {
     'entry_bg': '#2d2d2d',        # Entry field background
     'entry_fg': '#e0e0e0',        # Entry field text
     'record_active': '#ff4444',   # Red for recording
+    'header_bg': '#2d2d2d',       # Header background
+    'list_bg': '#1a1a1a',         # Listbox background
+    'accent': '#0078d7',          # Accent color
 }
 
 # -------------------------------------------------
