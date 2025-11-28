@@ -22,7 +22,6 @@ class M3U8StreamingPlayer:
         self.is_playing = False
         self.is_seeking = False
         self.is_fullscreen = False
-        self.is_recording = False
         self.show_config = True
         self.show_history = False
         self.current_url = ""
@@ -324,7 +323,6 @@ class M3U8StreamingPlayer:
 
         # Initialize hidden/extra controls to avoid errors
         self.volume_label = tk.Label(self.root, text="")
-        self.record_btn = tk.Button(self.root)
         # self.speed_label already initialized in setup_menu() - don't overwrite!
         self.volume_hide_timer = None
 
@@ -550,32 +548,8 @@ class M3U8StreamingPlayer:
             self.time_label_left.config(text="00:00:00")
             self.progress_scale.set_progress(0)
             self.progress_scale.set_buffer(0)
-            
-            if self.is_recording:
-                self.toggle_recording()
 
-    def toggle_recording(self):
-        if not self.is_playing: return
-        
-        if not self.is_recording:
-            # Start Recording
-            if not os.path.exists("downloads"):
-                os.makedirs("downloads")
-            
-            filename = f"stream_{datetime.now().strftime('%Y%m%d_%H%M%S')}.ts"
-            unique_filename = get_unique_filename("downloads", filename)
-            filepath = os.path.join("downloads", unique_filename)
-            
-            self.player.start_recording(filepath)
-            self.is_recording = True
-            self.record_btn.config(bg=COLORS['record_active'], text="● Stop Rec")
-            messagebox.showinfo("Recording Started", f"Recording to: {filepath}")
-        else:
-            # Stop Recording
-            self.player.stop_recording()
-            self.is_recording = False
-            self.record_btn.config(bg=COLORS['button_bg'], text="● Rec")
-            messagebox.showinfo("Recording Stopped", "Recording saved.")
+
 
     def skip(self, seconds):
         if self.player: self.player.seek(seconds)
