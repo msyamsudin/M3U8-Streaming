@@ -3,6 +3,7 @@ import os
 from datetime import datetime
 
 HISTORY_FILE = "history.json"
+SETTINGS_FILE = "settings.json"
 
 def format_time(secs):
     """Format seconds into HH:MM:SS string."""
@@ -100,3 +101,21 @@ def get_unique_filename(base_path, filename):
         new_filename = f"{name}_{counter}{ext}"
         counter += 1
     return new_filename
+
+def load_settings():
+    """Load settings from JSON file."""
+    if not os.path.exists(SETTINGS_FILE):
+        return {}
+    try:
+        with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_settings(settings):
+    """Save settings to JSON file."""
+    try:
+        with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(settings, f, indent=2)
+    except Exception as e:
+        print(f"Error saving settings: {e}")

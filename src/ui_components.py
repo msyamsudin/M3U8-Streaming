@@ -83,17 +83,18 @@ class HistoryPanel(tk.Frame):
             self.delete_callback(index)
 
 class LoadingSpinner:
-    def __init__(self, parent, size=50, color="white", bg_color="black"):
+    def __init__(self, parent, size=60, color="white", bg_color="black"):
         self.parent = parent
         self.size = size
-        self.color = color
-        self.bg_color = bg_color # Kept for compatibility, but we'll use a chroma key
+        self.color = "white" # Force white as per reference
+        self.bg_color = bg_color
         self.window = None
+        self.dimmer = None
         self.canvas = None
         self.angle = 0
         self.is_spinning = False
         self.timer_id = None
-        self.chroma_key = "#add123" # Distinct color for transparency
+        self.chroma_key = "#add123"
 
     def draw(self):
         if not self.canvas: return
@@ -103,41 +104,44 @@ class LoadingSpinner:
         h = self.size
         
         start = self.angle
-        extent = 60
+        extent = 90 # Shorter arc for a cleaner look
         
-        # Draw arcs with thicker width
-        self.canvas.create_arc(5, 5, w-5, h-5, start=start, extent=extent, 
-                              outline=self.color, width=4, style="arc")
-        self.canvas.create_arc(5, 5, w-5, h-5, start=start+180, extent=extent, 
-                              outline=self.color, width=4, style="arc")
+        # Draw single thin white arc
+        self.canvas.create_arc(4, 4, w-4, h-4, start=start, extent=extent, 
+                              outline=self.color, width=3, style="arc")
 
     def spin(self):
         if self.is_spinning and self.canvas:
-            self.angle = (self.angle + 20) % 360
+            self.angle = (self.angle - 15) % 360 # Counter-clockwise or Clockwise? Let's go Clockwise (negative)
             self.draw()
-            self.timer_id = self.parent.after(50, self.spin)
+            self.timer_id = self.parent.after(30, self.spin) # Faster smooth animation
 
     def start(self):
         if not self.is_spinning:
             self.is_spinning = True
             
-            # Create Toplevel for transparency
+            # 1. Create Dimmer (Dark Overlay)
+            self.dimmer = tk.Toplevel(self.parent)
+            self.dimmer.overrideredirect(True)
+            self.dimmer.config(bg='black')
+            self.dimmer.attributes('-alpha', 0.5) # 50% opacity
+            
+            # 2. Create Spinner Window (Transparent)
             self.window = tk.Toplevel(self.parent)
             self.window.overrideredirect(True)
             self.window.attributes('-topmost', True)
             
-            # Set transparency
+            # Set transparency for spinner
             try:
                 self.window.config(bg=self.chroma_key)
                 self.window.wm_attributes('-transparentcolor', self.chroma_key)
             except:
-                # Fallback for non-Windows or if transparency fails
                 self.window.config(bg=self.bg_color)
             
-            # Calculate position (Center of parent)
+            # Calculate position
             self.update_position()
             
-            # Bind to parent configure to update position
+            # Bind to parent configure
             self.parent.bind('<Configure>', self.update_position, add="+")
             
             self.canvas = tk.Canvas(self.window, width=self.size, height=self.size, 
@@ -147,12 +151,25 @@ class LoadingSpinner:
             self.spin()
 
     def update_position(self, event=None):
-        if self.window and self.parent.winfo_exists():
+        if self.parent.winfo_exists():
             try:
-                x = self.parent.winfo_rootx() + (self.parent.winfo_width() // 2) - (self.size // 2)
-                y = self.parent.winfo_rooty() + (self.parent.winfo_height() // 2) - (self.size // 2)
-                self.window.geometry(f"+{x}+{y}")
-                self.window.lift()
+                # Parent geometry
+                px = self.parent.winfo_rootx()
+                py = self.parent.winfo_rooty()
+                pw = self.parent.winfo_width()
+                ph = self.parent.winfo_height()
+                
+                # Update Dimmer
+                if self.dimmer:
+                    self.dimmer.geometry(f"{pw}x{ph}+{px}+{py}")
+                    self.dimmer.lift()
+                
+                # Update Spinner
+                if self.window:
+                    x = px + (pw // 2) - (self.size // 2)
+                    y = py + (ph // 2) - (self.size // 2)
+                    self.window.geometry(f"+{x}+{y}")
+                    self.window.lift()
             except: pass
 
     def stop(self):
@@ -165,9 +182,10 @@ class LoadingSpinner:
             self.window.destroy()
             self.window = None
             self.canvas = None
-            # Unbind is tricky because we used add="+", but since we destroy the window, 
-            # the update_position check for self.window will fail gracefully.
-            # Ideally we should unbind, but Tkinter doesn't make it easy to unbind specific functions.
+            
+        if self.dimmer:
+            self.dimmer.destroy()
+            self.dimmer = None
 
 class BufferedScale(tk.Canvas):
     def __init__(self, master, command=None, **kwargs):

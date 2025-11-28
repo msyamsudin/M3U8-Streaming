@@ -18,25 +18,25 @@ MPV_PATHS = [
 #  MPC-HC Style Colors (Dark Theme)
 # -------------------------------------------------
 COLORS = {
-    'bg': '#1a1a1a',              # Dark background
-    'menu_bg': '#2d2d2d',         # Menu bar background (dark gray)
-    'toolbar_bg': '#2d2d2d',      # Toolbar background (dark gray)
-    'control_bg': '#1a1a1a',      # Control panel background (very dark)
-    'video_bg': '#000000',        # Video area (black)
-    'button_bg': '#3d3d3d',       # Button background (medium dark gray)
-    'button_hover': '#4d4d4d',    # Button hover (lighter gray)
-    'button_active': '#555555',   # Button active
-    'text': '#e0e0e0',            # Light gray text
-    'text_gray': '#999999',       # Gray text
-    'border': '#000000',          # Border color (black)
-    'seekbar': '#0078d7',         # Blue seekbar
-    'seekbar_bg': '#3d3d3d',      # Seekbar background (dark gray)
+    'bg': '#0f0f0f',              # Deep black background
+    'menu_bg': '#0f0f0f',         # Menu bar background
+    'toolbar_bg': '#0f0f0f',      # Toolbar background
+    'control_bg': '#0f0f0f',      # Control panel background
+    'video_bg': '#000000',        # Video area
+    'button_bg': '#0f0f0f',       # Button background (transparent-ish)
+    'button_hover': '#2d2d2d',    # Button hover
+    'button_active': '#3d3d3d',   # Button active
+    'text': '#ffffff',            # White text
+    'text_gray': '#aaaaaa',       # Gray text
+    'border': '#000000',          # Border color
+    'seekbar': '#ff004d',         # Red/Pink seekbar (Reference match)
+    'seekbar_bg': '#3d3d3d',      # Seekbar background
     'entry_bg': '#2d2d2d',        # Entry field background
-    'entry_fg': '#e0e0e0',        # Entry field text
+    'entry_fg': '#ffffff',        # Entry field text
     'record_active': '#ff4444',   # Red for recording
-    'header_bg': '#2d2d2d',       # Header background
-    'list_bg': '#1a1a1a',         # Listbox background
-    'accent': '#0078d7',          # Accent color
+    'header_bg': '#1a1a1a',       # Header background
+    'list_bg': '#0f0f0f',         # Listbox background
+    'accent': '#ff004d',          # Accent color
 }
 
 # -------------------------------------------------

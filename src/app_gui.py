@@ -8,7 +8,7 @@ from datetime import datetime
 from .config import COLORS, USER_AGENTS
 from .player_core import MpvPlayer
 from .ui_components import StyledButton, HistoryPanel, LoadingSpinner, BufferedScale
-from .utils import format_time, load_history, save_history, get_unique_filename, write_history, update_history_progress, get_history_item
+from .utils import format_time, load_history, save_history, get_unique_filename, write_history, update_history_progress, get_history_item, load_settings, save_settings
 
 class M3U8StreamingPlayer:
     def __init__(self, root):
@@ -41,6 +41,10 @@ class M3U8StreamingPlayer:
         self.drag_start_x = 0
         self.drag_start_y = 0
         self.is_dragging = False
+
+        # Settings
+        self.settings = load_settings()
+        self.control_layout = self.settings.get('control_layout', 'right') # Default to right
 
         # Initialize UI
         self.setup_styles()
@@ -155,6 +159,17 @@ class M3U8StreamingPlayer:
         view_menu.add_command(label="Fullscreen (F)", command=self.toggle_fullscreen)
         self.always_on_top_var = tk.BooleanVar(value=False)
         view_menu.add_checkbutton(label="Always on Top", variable=self.always_on_top_var, command=self.toggle_always_on_top)
+        
+        view_menu.add_separator()
+        
+        # Control Layout Submenu
+        layout_menu = Menu(view_menu, tearoff=0, bg=COLORS['menu_bg'], fg=COLORS['text'])
+        self.layout_var = tk.StringVar(value=self.control_layout)
+        layout_menu.add_radiobutton(label="Split (Left/Right)", variable=self.layout_var, value="split", command=lambda: self.apply_control_layout("split"))
+        layout_menu.add_radiobutton(label="All Right (Default)", variable=self.layout_var, value="right", command=lambda: self.apply_control_layout("right"))
+        layout_menu.add_radiobutton(label="All Left", variable=self.layout_var, value="left", command=lambda: self.apply_control_layout("left"))
+        view_menu.add_cascade(label="Control Layout", menu=layout_menu)
+        
         self.view_btn.config(menu=view_menu)
 
 
@@ -199,6 +214,9 @@ class M3U8StreamingPlayer:
         # Loading Spinner (Overlay)
         self.spinner = LoadingSpinner(self.video_frame, size=60, color='#00FF00', bg_color=COLORS['video_bg'])
         
+        # Top Overlay (Heart, Clock, Share)
+        # self.setup_overlay() # Removed as per request
+        
         # Control Panel
         self.setup_control_panel()
 
@@ -231,83 +249,125 @@ class M3U8StreamingPlayer:
         
         inner.columnconfigure(1, weight=1)
 
+    # def setup_overlay(self):
+    #     # Overlay container (Top Right of Video Frame)
+    #     self.overlay_frame = tk.Frame(self.video_frame, bg=COLORS['video_bg'])
+    #     self.overlay_frame.place(relx=1.0, rely=0.0, anchor='ne', x=-10, y=10)
+    #     
+    #     # Icons (using Unicode for now)
+    #     # Clock (History)
+    #     self.hist_btn = tk.Label(self.overlay_frame, text="🕒", bg=COLORS['video_bg'], fg='white', font=('Segoe UI', 16), cursor="hand2")
+    #     self.hist_btn.pack(side=tk.TOP, pady=5)
+    #     self.hist_btn.bind("<Button-1>", lambda e: self.toggle_history())
+
+    def copy_url(self):
+        if self.current_url:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(self.current_url)
+            messagebox.showinfo("Copied", "Stream URL copied to clipboard")
+        
     def setup_control_panel(self):
-        self.control_panel = tk.Frame(self.player_area, bg=COLORS['control_bg'], relief=tk.RAISED, bd=1)
-        self.control_panel.pack(fill=tk.X, side=tk.BOTTOM)
+        self.control_panel = tk.Frame(self.player_area, bg=COLORS['control_bg'], bd=0)
+        self.control_panel.pack(fill=tk.X, side=tk.BOTTOM, pady=0)
         
-        # Seekbar
+        # 1. Seekbar (Top of controls)
         seek_frame = tk.Frame(self.control_panel, bg=COLORS['control_bg'])
-        seek_frame.pack(fill=tk.X, padx=8, pady=(8, 1))
-        
-        self.time_label_left = tk.Label(seek_frame, text="00:00:00", bg=COLORS['control_bg'], fg=COLORS['text'], font=('Segoe UI', 8))
-        self.time_label_left.pack(side=tk.LEFT, padx=(0, 8))
+        seek_frame.pack(fill=tk.X, padx=0, pady=(0, 5))
         
         self.progress_scale = BufferedScale(seek_frame, command=self.on_seek_end)
-        self.progress_scale.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.progress_scale.pack(fill=tk.X, expand=True)
         
-        self.time_label_right = tk.Label(seek_frame, text="00:00:00", bg=COLORS['control_bg'], fg=COLORS['text'], font=('Segoe UI', 8))
-        self.time_label_right.pack(side=tk.LEFT, padx=(8, 0))
+        # 2. Controls Row (Bottom)
+        self.ctrl_frame = tk.Frame(self.control_panel, bg=COLORS['control_bg'])
+        self.ctrl_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
         
-        StyledButton(seek_frame, text="⛶", command=self.toggle_fullscreen, width=2, padx=2, pady=2).pack(side=tk.LEFT, padx=(8, 0))
+        # --- Right Section: Settings, Fullscreen ---
+        self.ctrl_right = tk.Frame(self.ctrl_frame, bg=COLORS['control_bg'])
+        # self.ctrl_right.pack(side=tk.RIGHT) # Handled by apply_control_layout
         
-        # Controls Row
-        ctrl_frame = tk.Frame(self.control_panel, bg=COLORS['control_bg'])
-        ctrl_frame.pack(fill=tk.X, padx=8, pady=(1, 8))
-        
-        # Left: Playback
-        left = tk.Frame(ctrl_frame, bg=COLORS['control_bg'])
-        left.pack(side=tk.LEFT)
-        
-        StyledButton(left, text="Open", command=self.show_open_dialog).pack(side=tk.LEFT, padx=2)
-        StyledButton(left, text="⮜", command=lambda: self.skip(-10), width=3).pack(side=tk.LEFT, padx=2)
-        self.play_btn = StyledButton(left, text="▶", command=self.toggle_play_pause, width=4, font=('Segoe UI', 10))
-        self.play_btn.pack(side=tk.LEFT, padx=2)
-        StyledButton(left, text="■", command=self.stop_stream, width=3).pack(side=tk.LEFT, padx=2)
-        StyledButton(left, text="⮞", command=lambda: self.skip(10), width=3).pack(side=tk.LEFT, padx=2)
-        
-        self.record_btn = StyledButton(left, text="● Rec", command=self.toggle_recording)
-        self.record_btn.pack(side=tk.LEFT, padx=2)
-        
-        StyledButton(left, text="History", command=self.toggle_history).pack(side=tk.LEFT, padx=2)
-        
-        # Center: Quality Selector (Moved here from below)
-        center = tk.Frame(ctrl_frame, bg=COLORS['control_bg'])
-        center.pack(side=tk.LEFT, expand=True)
-        
-        # Quality Selector (Hidden initially)
+        # History Button
+        StyledButton(self.ctrl_right, text="🕒", command=self.toggle_history, width=2).pack(side=tk.LEFT, padx=(0, 5))
+
+        # Quality Selector
         self.quality_var = tk.StringVar()
-        self.quality_combo = ttk.Combobox(center, textvariable=self.quality_var, state="readonly", width=15)
+        self.quality_combo = ttk.Combobox(self.ctrl_right, textvariable=self.quality_var, state="readonly", width=10)
         self.quality_combo.bind("<<ComboboxSelected>>", self.on_quality_change)
         
+        # Fullscreen
+        StyledButton(self.ctrl_right, text="⛶", command=self.toggle_fullscreen, width=2).pack(side=tk.LEFT, padx=(5, 0))
 
+        # --- Left Section: Play/Pause, Volume, Time ---
+        self.ctrl_left = tk.Frame(self.ctrl_frame, bg=COLORS['control_bg'])
+        # self.ctrl_left.pack(side=tk.RIGHT) # Handled by apply_control_layout
         
-        # Right: Volume
-        self.volume_frame = tk.Frame(ctrl_frame, bg=COLORS['control_bg'])
-        self.volume_frame.pack(side=tk.RIGHT)
+        # Play/Pause
+        # Use a sub-frame for precise alignment
+        btn_frame = tk.Frame(self.ctrl_left, bg=COLORS['control_bg'])
+        btn_frame.pack(side=tk.LEFT, padx=(0, 10))
         
-        self.mute_btn = StyledButton(self.volume_frame, text="🔊", command=self.toggle_mute, width=3)
-        self.mute_btn.pack(side=tk.LEFT, padx=(2, 0))
+        StyledButton(btn_frame, text="⮜", command=lambda: self.skip(-10), width=3, font=('Segoe UI', 11)).grid(row=0, column=0, padx=2)
+        self.play_btn = StyledButton(btn_frame, text="▶", command=self.toggle_play_pause, width=3, font=('Segoe UI', 11))
+        self.play_btn.grid(row=0, column=1, padx=2)
+        StyledButton(btn_frame, text="⮞", command=lambda: self.skip(10), width=3, font=('Segoe UI', 11)).grid(row=0, column=2, padx=2)
+        
+        # Volume Group
+        vol_frame = tk.Frame(self.ctrl_left, bg=COLORS['control_bg'])
+        vol_frame.pack(side=tk.LEFT, padx=(0, 10))
+        
+        self.mute_btn = StyledButton(vol_frame, text="🔊", command=self.toggle_mute, width=2)
+        self.mute_btn.pack(side=tk.LEFT)
         
         self.volume_var = tk.IntVar(value=100)
-        self.volume_scale = ttk.Scale(self.volume_frame, from_=0, to=100, orient=tk.HORIZONTAL, variable=self.volume_var, command=self.on_volume_change, length=80, style='MPC.Horizontal.TScale')
-        # Initially hidden
+        self.volume_scale = ttk.Scale(vol_frame, from_=0, to=100, orient=tk.HORIZONTAL, variable=self.volume_var, command=self.on_volume_change, length=80, style='MPC.Horizontal.TScale')
+        self.volume_scale.pack(side=tk.LEFT, padx=5)
         
-        self.volume_label = tk.Label(self.volume_frame, text="100%", bg=COLORS['control_bg'], fg=COLORS['text'], font=('Segoe UI', 8), width=5)
-        # Initially hidden
-        # self.volume_label.pack(side=tk.LEFT, padx=2)
+        # Time Label
+        time_frame = tk.Frame(self.ctrl_left, bg=COLORS['control_bg'])
+        time_frame.pack(side=tk.LEFT)
+        self.time_label_left = tk.Label(time_frame, text="00:00:00", bg=COLORS['control_bg'], fg=COLORS['text'], font=('Segoe UI', 9))
+        self.time_label_left.pack(side=tk.LEFT)
+        tk.Label(time_frame, text=" / ", bg=COLORS['control_bg'], fg=COLORS['text_gray'], font=('Segoe UI', 9)).pack(side=tk.LEFT)
+        self.time_label_right = tk.Label(time_frame, text="00:00:00", bg=COLORS['control_bg'], fg=COLORS['text_gray'], font=('Segoe UI', 9))
+        self.time_label_right.pack(side=tk.LEFT)
 
-        # Hover Bindings
-        self.volume_frame.bind('<Enter>', self.show_volume_slider)
-        self.volume_frame.bind('<Leave>', self.schedule_hide_volume)
-        self.mute_btn.bind('<Enter>', self.show_volume_slider)
-        self.volume_scale.bind('<Enter>', self.show_volume_slider)
-        self.volume_label.bind('<Enter>', self.show_volume_slider)
-        
+        # Apply Initial Layout
+        self.apply_control_layout(self.control_layout)
+
+        # Initialize hidden/extra controls to avoid errors
+        self.volume_label = tk.Label(self.root, text="")
+        self.record_btn = tk.Button(self.root)
+        self.speed_label = tk.Label(self.root)
         self.volume_hide_timer = None
 
-    # ------------------------------------------------------------------
-    #  Logic
-    # ------------------------------------------------------------------
+    def apply_control_layout(self, layout_type):
+        self.control_layout = layout_type
+        self.layout_var.set(layout_type)
+        
+        # Save setting
+        self.settings['control_layout'] = layout_type
+        save_settings(self.settings)
+        
+        # Reset packing
+        self.ctrl_left.pack_forget()
+        self.ctrl_right.pack_forget()
+        
+        if layout_type == "split":
+            # Left controls on Left, Right controls on Right
+            self.ctrl_left.pack(side=tk.LEFT)
+            self.ctrl_right.pack(side=tk.RIGHT)
+            
+        elif layout_type == "left":
+            # All controls on Left
+            # Pack Left first (to be leftmost), then Right (to be next to it)
+            self.ctrl_left.pack(side=tk.LEFT)
+            self.ctrl_right.pack(side=tk.LEFT)
+            
+        else: # "right" (Default)
+            # All controls on Right
+            # Pack Right first (to be rightmost), then Left (to be next to it)
+            self.ctrl_right.pack(side=tk.RIGHT)
+            self.ctrl_left.pack(side=tk.RIGHT)
+
     def show_open_dialog(self):
         if self.show_config:
             self.config_panel.pack_forget()
