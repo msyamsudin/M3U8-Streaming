@@ -7,7 +7,7 @@ from datetime import datetime
 
 from .config import COLORS, USER_AGENTS
 from .player_core import MpvPlayer
-from .ui_components import StyledButton, HistoryPanel, LoadingSpinner, BufferedScale
+from .ui_components import StyledButton, PrimaryButton, HistoryPanel, LoadingSpinner, BufferedScale
 from .utils import format_time, load_history, save_history, get_unique_filename, write_history, update_history_progress, get_history_item, load_settings, save_settings
 
 class M3U8StreamingPlayer:
@@ -245,20 +245,9 @@ class M3U8StreamingPlayer:
         self.ua_var = tk.StringVar(value="Chrome")
         ttk.Combobox(inner, textvariable=self.ua_var, values=list(USER_AGENTS.keys()), state="readonly").grid(row=2, column=1, sticky=tk.W, padx=5, pady=5)
         
-        StyledButton(inner, text="Load Stream", command=self.load_and_play_stream).grid(row=2, column=1, sticky=tk.E, padx=5, pady=5)
+        PrimaryButton(inner, text="Load Stream", command=self.load_and_play_stream).grid(row=2, column=1, sticky=tk.E, padx=5, pady=5)
         
         inner.columnconfigure(1, weight=1)
-
-    # def setup_overlay(self):
-    #     # Overlay container (Top Right of Video Frame)
-    #     self.overlay_frame = tk.Frame(self.video_frame, bg=COLORS['video_bg'])
-    #     self.overlay_frame.place(relx=1.0, rely=0.0, anchor='ne', x=-10, y=10)
-    #     
-    #     # Icons (using Unicode for now)
-    #     # Clock (History)
-    #     self.hist_btn = tk.Label(self.overlay_frame, text="🕒", bg=COLORS['video_bg'], fg='white', font=('Segoe UI', 16), cursor="hand2")
-    #     self.hist_btn.pack(side=tk.TOP, pady=5)
-    #     self.hist_btn.bind("<Button-1>", lambda e: self.toggle_history())
 
     def copy_url(self):
         if self.current_url:

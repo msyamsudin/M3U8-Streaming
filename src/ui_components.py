@@ -24,6 +24,29 @@ class StyledButton(tk.Button):
         if self['state'] != 'disabled':
             self['bg'] = COLORS['button_bg']
 
+class PrimaryButton(StyledButton):
+    def __init__(self, master, **kwargs):
+        super().__init__(master, **kwargs)
+        # Use colors from config
+        self.bg_normal = COLORS.get('load_btn_bg', '#007ACC')
+        self.bg_hover = COLORS.get('load_btn_hover', '#0098FF')
+        self.bg_active = COLORS.get('load_btn_active', '#005FA3')
+        
+        self.config(
+            bg=self.bg_normal,
+            fg=COLORS.get('load_btn_fg', '#ffffff'),
+            activebackground=self.bg_active,
+            activeforeground=COLORS.get('load_btn_fg', '#ffffff')
+        )
+        
+    def on_enter(self, e):
+        if self['state'] != 'disabled':
+            self['bg'] = self.bg_hover
+
+    def on_leave(self, e):
+        if self['state'] != 'disabled':
+            self['bg'] = self.bg_normal
+
 class HistoryPanel(tk.Frame):
     def __init__(self, master, load_callback, delete_callback, clear_callback):
         super().__init__(master, bg=COLORS['bg'])
@@ -194,7 +217,7 @@ class BufferedScale(tk.Canvas):
         self.progress = 0.0  # 0 to 100
         self.buffer = 0.0    # 0 to 100
         
-        self.config(bg=COLORS['control_bg'], highlightthickness=0, height=15)
+        self.config(bg=COLORS['control_bg'], highlightthickness=0, height=20)
         self.bind('<Configure>', self.draw)
         self.bind('<Button-1>', self.on_click)
         self.bind('<B1-Motion>', self.on_drag)
@@ -217,21 +240,35 @@ class BufferedScale(tk.Canvas):
         h = self.winfo_height()
         cy = h / 2
         
-        # Background track
-        self.create_rectangle(0, cy-2, w, cy+2, fill=COLORS['seekbar_bg'], outline="")
+        # Track dimensions
+        track_h = 8
+        y1 = cy - (track_h / 2)
+        y2 = cy + (track_h / 2)
+        
+        # Background track (Rounded)
+        self.create_rectangle(0, y1, w, y2, fill=COLORS['seekbar_bg'], outline="", tags="track")
+        # Add rounded caps for background? Simple rectangle is fine for now or we can use a line with capstyle
         
         # Buffer track
         if self.buffer > 0:
             bw = (self.buffer / 100) * w
-            self.create_rectangle(0, cy-2, bw, cy+2, fill=COLORS['text_gray'], outline="")
+            self.create_rectangle(0, y1, bw, y2, fill=COLORS['text_gray'], outline="")
             
         # Progress track
         if self.progress > 0:
             pw = (self.progress / 100) * w
-            self.create_rectangle(0, cy-2, pw, cy+2, fill=COLORS['accent'], outline="")
+            self.create_rectangle(0, y1, pw, y2, fill=COLORS['accent'], outline="")
             
-            # Thumb
-            self.create_oval(pw-6, cy-6, pw+6, cy+6, fill=COLORS['text'], outline=COLORS['accent'])
+            # Thumb (Vertical Pill)
+            thumb_w = 6
+            thumb_h = 16
+            tx1 = pw - (thumb_w / 2)
+            tx2 = pw + (thumb_w / 2)
+            ty1 = cy - (thumb_h / 2)
+            ty2 = cy + (thumb_h / 2)
+            
+            # Ensure thumb stays within bounds visually if needed, but centering on progress is standard
+            self.create_rectangle(tx1, ty1, tx2, ty2, fill=COLORS['text'], outline=COLORS['accent'], width=1)
 
     def on_click(self, event):
         self.is_dragging = True

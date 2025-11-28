@@ -29,14 +29,18 @@ COLORS = {
     'text': '#ffffff',            # White text
     'text_gray': '#aaaaaa',       # Gray text
     'border': '#000000',          # Border color
-    'seekbar': '#ff004d',         # Red/Pink seekbar (Reference match)
+    'seekbar': '#007ACC',         # Red/Pink seekbar (Reference match)
     'seekbar_bg': '#3d3d3d',      # Seekbar background
     'entry_bg': '#2d2d2d',        # Entry field background
     'entry_fg': '#ffffff',        # Entry field text
     'record_active': '#ff4444',   # Red for recording
     'header_bg': '#1a1a1a',       # Header background
     'list_bg': '#0f0f0f',         # Listbox background
-    'accent': '#ff004d',          # Accent color
+    'accent': '#007ACC',          # Accent color
+    'load_btn_bg': '#007ACC',     # Load Stream Button Background
+    'load_btn_fg': '#ffffff',     # Load Stream Button Text
+    'load_btn_hover': '#0098FF',  # Load Stream Button Hover
+    'load_btn_active': '#005FA3', # Load Stream Button Active
 }
 
 # -------------------------------------------------
