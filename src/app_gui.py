@@ -325,7 +325,7 @@ class M3U8StreamingPlayer:
         # Initialize hidden/extra controls to avoid errors
         self.volume_label = tk.Label(self.root, text="")
         self.record_btn = tk.Button(self.root)
-        self.speed_label = tk.Label(self.root)
+        # self.speed_label already initialized in setup_menu() - don't overwrite!
         self.volume_hide_timer = None
 
     def apply_control_layout(self, layout_type):
