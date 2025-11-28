@@ -29,7 +29,7 @@ COLORS = {
     'text': '#ffffff',            # White text
     'text_gray': '#aaaaaa',       # Gray text
     'border': '#000000',          # Border color
-    'seekbar': '#007ACC',         # Red/Pink seekbar (Reference match)
+    'seekbar': '#007ACC',         # Seekbar (Reference match)
     'seekbar_bg': '#3d3d3d',      # Seekbar background
     'entry_bg': '#2d2d2d',        # Entry field background
     'entry_fg': '#ffffff',        # Entry field text
@@ -41,6 +41,12 @@ COLORS = {
     'load_btn_fg': '#ffffff',     # Load Stream Button Text
     'load_btn_hover': '#0098FF',  # Load Stream Button Hover
     'load_btn_active': '#005FA3', # Load Stream Button Active
+    'speed_fg': '#007ACC',        # Speed indicator text color
+    'status_ready_fg': '#aaaaaa', # Status Ready text color
+    'status_loading_fg': '#ffffff', # Status Loading text color
+    'status_playing_fg': '#007ACC', # Status Playing text color (blue)
+    'status_paused_fg': '#FFA500',  # Status Paused text color (orange)
+    'status_stopped_fg': '#FF0000', # Status Stopped text color (red)
 }
 
 # -------------------------------------------------

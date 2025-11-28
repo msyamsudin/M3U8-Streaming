@@ -180,14 +180,14 @@ class M3U8StreamingPlayer:
         
         # Speed Label (Now first/left)
         self.speed_label = tk.Label(self.menu_right, text="", bg=COLORS['menu_bg'], 
-                                   fg='#00FF00', font=('Consolas', 9, 'bold'))
+                                   fg=COLORS['speed_fg'], font=('Consolas', 9, 'bold'))
         self.speed_label.pack(side=tk.LEFT, padx=(0, 5))
 
         # Separator
         tk.Label(self.menu_right, text="|", bg=COLORS['menu_bg'], fg=COLORS['text_gray'], font=('Segoe UI', 9)).pack(side=tk.LEFT, padx=5)
 
         # Status Label (Now second/right)
-        self.status_label = tk.Label(self.menu_right, text="Ready", bg=COLORS['menu_bg'], fg=COLORS['text_gray'], font=('Segoe UI', 9))
+        self.status_label = tk.Label(self.menu_right, text="Ready", bg=COLORS['menu_bg'], fg=COLORS['status_ready_fg'], font=('Segoe UI', 9))
         self.status_label.pack(side=tk.LEFT)
 
     def setup_ui(self):
@@ -408,7 +408,7 @@ class M3U8StreamingPlayer:
             return
         
         self.current_url = url
-        self.status_label.config(text="Loading...", fg=COLORS['text'])
+        self.status_label.config(text="Loading...", fg=COLORS['status_loading_fg'])
         self.spinner.start()
         
         # Save to history
@@ -471,7 +471,7 @@ class M3U8StreamingPlayer:
 
     def _on_play_start(self):
         self.play_btn.config(text="⏸")
-        self.status_label.config(text="Playing", fg='green')
+        self.status_label.config(text="Playing", fg=COLORS['status_playing_fg'])
         self.video_canvas.focus_set()
         
         # Update Quality List
@@ -526,18 +526,18 @@ class M3U8StreamingPlayer:
 
         if self.player and self.player.pause():
             self.play_btn.config(text="▶")
-            self.status_label.config(text="Paused", fg='orange')
+            self.status_label.config(text="Paused", fg=COLORS['status_paused_fg'])
             self.spinner.stop() # Ensure spinner is hidden when paused
         else:
             self.play_btn.config(text="⏸")
-            self.status_label.config(text="Playing", fg='green')
+            self.status_label.config(text="Playing", fg=COLORS['status_playing_fg'])
 
     def stop_stream(self):
         if self.player:
             self.player.stop()
             self.is_playing = False
             self.play_btn.config(text="▶")
-            self.status_label.config(text="Stopped", fg='red')
+            self.status_label.config(text="Stopped", fg=COLORS['status_stopped_fg'])
             self.spinner.stop()
             
             # Save progress before stopping
