@@ -106,8 +106,9 @@ class HistoryPanel(tk.Frame):
             self.delete_callback(index)
 
 class LoadingSpinner:
-    def __init__(self, parent, size=60, color="white", bg_color="black"):
+    def __init__(self, parent, size=60, color="white", bg_color="black", root_window=None):
         self.parent = parent
+        self.root_window = root_window  # Main window for state tracking
         self.size = size
         self.color = "white" # Force white as per reference
         self.bg_color = bg_color
@@ -118,6 +119,8 @@ class LoadingSpinner:
         self.is_spinning = False
         self.timer_id = None
         self.chroma_key = "#add123"
+        self.windows_hidden = False  # Track if windows are hidden due to minimize
+        self.state_check_id = None  # Timer for state polling
 
     def draw(self):
         if not self.canvas: return
@@ -152,7 +155,7 @@ class LoadingSpinner:
             # 2. Create Spinner Window (Transparent)
             self.window = tk.Toplevel(self.parent)
             self.window.overrideredirect(True)
-            self.window.attributes('-topmost', True)
+            # Don't use topmost - let it follow parent window's z-order
             
             # Set transparency for spinner
             try:
@@ -170,6 +173,10 @@ class LoadingSpinner:
             self.canvas = tk.Canvas(self.window, width=self.size, height=self.size, 
                                    bg=self.chroma_key, highlightthickness=0)
             self.canvas.pack(fill=tk.BOTH, expand=True)
+            
+            # Start window state polling
+            if self.root_window:
+                self.check_window_state()
             
             self.spin()
 
@@ -201,6 +208,11 @@ class LoadingSpinner:
             self.parent.after_cancel(self.timer_id)
             self.timer_id = None
         
+        # Stop state polling
+        if self.state_check_id:
+            self.parent.after_cancel(self.state_check_id)
+            self.state_check_id = None
+        
         if self.window:
             self.window.destroy()
             self.window = None
@@ -209,6 +221,41 @@ class LoadingSpinner:
         if self.dimmer:
             self.dimmer.destroy()
             self.dimmer = None
+
+    def check_window_state(self):
+        """Periodically check if window is minimized or unfocused and hide/show spinner accordingly"""
+        if not self.is_spinning or not self.root_window:
+            return
+        
+        try:
+            # Check if window is minimized (iconic state)
+            is_minimized = self.root_window.state() == 'iconic'
+            
+            # Check if window has focus (is active)
+            has_focus = self.root_window.focus_displayof() is not None
+            
+            # Hide spinner if minimized OR window doesn't have focus
+            should_hide = is_minimized or not has_focus
+            
+            if should_hide and not self.windows_hidden:
+                # Window minimized or lost focus - hide spinner
+                if self.window and self.dimmer:
+                    self.window.withdraw()
+                    self.dimmer.withdraw()
+                    self.windows_hidden = True
+            elif not should_hide and self.windows_hidden:
+                # Window restored and has focus - show spinner
+                if self.window and self.dimmer:
+                    self.dimmer.deiconify()
+                    self.window.deiconify()
+                    self.update_position()
+                    self.windows_hidden = False
+        except:
+            pass
+        
+        # Continue polling every 200ms
+        if self.is_spinning:
+            self.state_check_id = self.parent.after(200, self.check_window_state)
 
 class BufferedScale(tk.Canvas):
     def __init__(self, master, command=None, **kwargs):

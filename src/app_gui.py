@@ -212,7 +212,7 @@ class M3U8StreamingPlayer:
         self.video_canvas.pack(fill=tk.BOTH, expand=True)
         
         # Loading Spinner (Overlay)
-        self.spinner = LoadingSpinner(self.video_frame, size=60, color='#00FF00', bg_color=COLORS['video_bg'])
+        self.spinner = LoadingSpinner(self.video_frame, size=60, color='#00FF00', bg_color=COLORS['video_bg'], root_window=self.root)
         
         # Top Overlay (Heart, Clock, Share)
         # self.setup_overlay() # Removed as per request
