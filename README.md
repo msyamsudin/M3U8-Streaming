@@ -4,7 +4,7 @@
 ![Platform](https://img.shields.io/badge/Platform-Windows-green)
 [![License: MIT](https://img.shields.io/badge/License-MIT-orange)](https://github.com/msyamsudin/M3U8-Streaming/blob/main/LICENSE)
 
-Pemutar streaming berbasis **HLS (.m3u8)** dengan dukungan **rekaman siaran langsung**, **riwayat URL**, dan **UI bertema gelap ala MPC-HC**, dibangun menggunakan **Python (Tkinter) + MPV**.
+Pemutar streaming berbasis **HLS (.m3u8)** dengan **riwayat URL**, **continue watching**, dan dibangun menggunakan **Python (Tkinter) + MPV**.
 
 ---
 
@@ -21,9 +21,11 @@ Pemutar streaming berbasis **HLS (.m3u8)** dengan dukungan **rekaman siaran lang
 | Fitur | Deskripsi |
 |-------|-----------|
 | 🎬 **Pemutaran Stream** | Mendukung HLS (.m3u8) |
-| 💾 **Perekaman Live** | Rekam streaming ke format `.ts` |
 | 🕒 **Riwayat URL** | Menyimpan URL yang baru diputar |
-| 🎨 **UI Modern** | Tema gelap mirip MPC-HC |
+| ⏯️ **Continue Watching** | Resume otomatis dari posisi terakhir |
+| 📊 **Speed Indicator** | Indikator kecepatan download real-time |
+| 🎨 **UI Modern** | Tema gelap mirip MPC-HC dengan customizable colors |
+| 🎚️ **Quality Selector** | Pilih kualitas video untuk adaptive streaming |
 | ⌨️ **Shortcut Lengkap** | Kontrol cepat layaknya video player profesional |
 
 ---
@@ -90,15 +92,23 @@ python main.py
 | `Ctrl + O`                | Input URL Stream       |
 | `Esc`                     | Keluar dari Fullscreen |
 | `H`                       | Tampilkan Riwayat      |
+
 ---
 
-## 🎥 Cara Merekam Streaming
+## 🎨 Kustomisasi Warna
 
-1. Putar URL streaming.
-2. Tekan tombol **Record** di toolbar.
-3. Tombol berubah menjadi merah 🟥 → proses rekam aktif.
-4. File akan disimpan otomatis ke folder `downloads/`.
-5. Tekan **Stop Rec** untuk menyelesaikan rekaman.
+Semua warna UI dapat dikustomisasi melalui file `src/config.py`:
+
+```python
+COLORS = {
+    'bg': '#0f0f0f',              # Background
+    'accent': '#007ACC',          # Accent color (seekbar, status)
+    'load_btn_bg': '#007ACC',     # Load button
+    'speed_fg': '#007ACC',        # Speed indicator
+    'status_playing_fg': '#007ACC', # Status saat playing
+    # ... dan banyak lagi
+}
+```
 
 ---
 
@@ -115,6 +125,5 @@ https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
 | Masalah                     | Solusi                                                     |
 | --------------------------- | ---------------------------------------------------------- |
 | Video tidak tampil          | Pastikan `libmpv-2.dll` sudah ditempatkan dengan benar     |
-| Tidak bisa merekam          | Pastikan folder `downloads/` tidak diblok/readonly         |
 | Error `ModuleNotFoundError` | Install library: `pip install python-mpv requests`         |
 | Streaming lag/stutter       | Cek koneksi internet, bitrate tinggi butuh bandwidth lebih |
