@@ -5,7 +5,7 @@ class StyledButton(tk.Button):
     def __init__(self, master, **kwargs):
         super().__init__(master, **kwargs)
         self.config(
-            bg=COLORS['button_bg'],
+            bg=COLORS['control_bg'],
             fg=COLORS['text'],
             activebackground=COLORS['button_active'],
             activeforeground=COLORS['text'],
@@ -22,7 +22,7 @@ class StyledButton(tk.Button):
 
     def on_leave(self, e):
         if self['state'] != 'disabled':
-            self['bg'] = COLORS['button_bg']
+            self['bg'] = COLORS['control_bg']
 
 class PrimaryButton(StyledButton):
     def __init__(self, master, **kwargs):

@@ -21,11 +21,11 @@ COLORS = {
     'bg': '#0f0f0f',              # Deep black background
     'menu_bg': '#0f0f0f',         # Menu bar background
     'toolbar_bg': '#0f0f0f',      # Toolbar background
-    'control_bg': '#0f0f0f',      # Control panel background
+    'control_bg': '#0a0a0a',      # Control panel background (very dark for overlay effect)
     'video_bg': '#000000',        # Video area
-    'button_bg': '#0f0f0f',       # Button background (transparent-ish)
-    'button_hover': '#2d2d2d',    # Button hover
-    'button_active': '#3d3d3d',   # Button active
+    'button_bg': '#2d2d2d',       # Button background (visible on transparent)
+    'button_hover': '#3d3d3d',    # Button hover
+    'button_active': '#4d4d4d',   # Button active
     'text': '#ffffff',            # White text
     'text_gray': '#aaaaaa',       # Gray text
     'border': '#000000',          # Border color
