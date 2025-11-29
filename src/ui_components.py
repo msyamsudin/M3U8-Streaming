@@ -287,14 +287,13 @@ class BufferedScale(tk.Canvas):
         h = self.winfo_height()
         cy = h / 2
         
-        # Track dimensions
-        track_h = 8
+        # Track dimensions (Thinner for sleek look)
+        track_h = 4
         y1 = cy - (track_h / 2)
         y2 = cy + (track_h / 2)
         
-        # Background track (Rounded)
+        # Background track
         self.create_rectangle(0, y1, w, y2, fill=COLORS['seekbar_bg'], outline="", tags="track")
-        # Add rounded caps for background? Simple rectangle is fine for now or we can use a line with capstyle
         
         # Buffer track
         if self.buffer > 0:
@@ -306,16 +305,14 @@ class BufferedScale(tk.Canvas):
             pw = (self.progress / 100) * w
             self.create_rectangle(0, y1, pw, y2, fill=COLORS['accent'], outline="")
             
-            # Thumb (Vertical Pill)
-            thumb_w = 6
-            thumb_h = 16
-            tx1 = pw - (thumb_w / 2)
-            tx2 = pw + (thumb_w / 2)
-            ty1 = cy - (thumb_h / 2)
-            ty2 = cy + (thumb_h / 2)
+            # Thumb (Circle)
+            radius = 6
+            tx1 = pw - radius
+            tx2 = pw + radius
+            ty1 = cy - radius
+            ty2 = cy + radius
             
-            # Ensure thumb stays within bounds visually if needed, but centering on progress is standard
-            self.create_rectangle(tx1, ty1, tx2, ty2, fill=COLORS['text'], outline=COLORS['accent'], width=1)
+            self.create_oval(tx1, ty1, tx2, ty2, fill='white', outline=COLORS['accent'], width=1)
 
     def on_click(self, event):
         self.is_dragging = True
