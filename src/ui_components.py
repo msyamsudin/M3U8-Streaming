@@ -2,10 +2,11 @@ import tkinter as tk
 from .config import COLORS
 
 class StyledButton(tk.Button):
-    def __init__(self, master, **kwargs):
+    def __init__(self, master, bg_color=None, **kwargs):
         super().__init__(master, **kwargs)
+        self.default_bg = bg_color if bg_color else COLORS['control_bg']
         self.config(
-            bg=COLORS['control_bg'],
+            bg=self.default_bg,
             fg=COLORS['text'],
             activebackground=COLORS['button_active'],
             activeforeground=COLORS['text'],
@@ -22,7 +23,7 @@ class StyledButton(tk.Button):
 
     def on_leave(self, e):
         if self['state'] != 'disabled':
-            self['bg'] = COLORS['control_bg']
+            self['bg'] = self.default_bg
 
 class RoundedButton(tk.Canvas):
     def __init__(self, master, text="", command=None, width=120, height=35, corner_radius=10, 
@@ -117,6 +118,170 @@ class PrimaryButton(RoundedButton):
                         bg=bg_normal, fg=fg, hover_bg=bg_hover, active_bg=bg_active,
                         width=120, height=32, corner_radius=16, **kwargs)
 
+from .utils import extract_expiration, get_remaining_time
+
+from .utils import extract_expiration, get_remaining_time, get_status_color
+import tkinter.ttk as ttk
+
+class ScrollableFrame(tk.Frame):
+    def __init__(self, container, *args, **kwargs):
+        super().__init__(container, *args, **kwargs)
+        self.canvas = tk.Canvas(self, bg=kwargs.get('bg', 'black'), highlightthickness=0)
+        self.scrollbar = tk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = tk.Frame(self.canvas, bg=kwargs.get('bg', 'black'))
+
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(
+                scrollregion=self.canvas.bbox("all")
+            )
+        )
+
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw", tags="frame")
+
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill="y")
+        
+        self.canvas.bind('<Configure>', self.on_canvas_configure)
+        
+        # Mousewheel scrolling
+        self.bind_mouse_scroll(self.canvas)
+        self.bind_mouse_scroll(self.scrollable_frame)
+
+    def on_canvas_configure(self, event):
+        # Resize the inner frame to match the canvas width
+        self.canvas.itemconfig("frame", width=event.width)
+
+    def bind_mouse_scroll(self, widget):
+        widget.bind("<MouseWheel>", self._on_mousewheel)
+        widget.bind("<Button-4>", self._on_mousewheel)
+        widget.bind("<Button-5>", self._on_mousewheel)
+
+    def _on_mousewheel(self, event):
+        if event.num == 5 or event.delta < 0:
+            self.canvas.yview_scroll(1, "units")
+        elif event.num == 4 or event.delta > 0:
+            self.canvas.yview_scroll(-1, "units")
+
+class HistoryItemRow(tk.Frame):
+    def __init__(self, master, item_data, load_callback, delete_callback, index, **kwargs):
+        bg_color = kwargs.get('bg', COLORS['bg'])
+        super().__init__(master, **kwargs)
+        self.item_data = item_data
+        self.load_callback = load_callback
+        self.delete_callback = delete_callback
+        self.index = index
+        self.default_bg = bg_color
+        self.hover_bg = COLORS.get('button_hover', '#333333')
+        
+        self.config(bg=self.default_bg, pady=8, padx=10)
+        
+        # Extract data
+        url = item_data.get('url', '')
+        name = item_data.get('title') or url
+        if len(name) > 60: name = name[:57] + "..."
+        
+        exp_timestamp = extract_expiration(url)
+        remaining = get_remaining_time(exp_timestamp)
+        status_color = get_status_color(exp_timestamp) or COLORS['accent']
+        
+        # 1. Status Dot (Canvas)
+        self.dot_canvas = tk.Canvas(self, width=10, height=10, bg=self.default_bg, highlightthickness=0)
+        self.dot_canvas.pack(side=tk.LEFT, padx=(0, 10))
+        self.dot_canvas.create_oval(2, 2, 8, 8, fill=status_color, outline="")
+        
+        # 2. Title/URL
+        self.lbl_title = tk.Label(self, text=name, bg=self.default_bg, fg=COLORS['text'], 
+                                 font=('Segoe UI', 9), anchor="w")
+        self.lbl_title.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        # 3. Right Side Container (Time + Actions)
+        self.right_frame = tk.Frame(self, bg=self.default_bg)
+        self.right_frame.pack(side=tk.RIGHT)
+        
+        # Time Label
+        time_text = remaining if remaining else ""
+        time_fg = status_color if remaining != "Expired" else "#666666"
+        self.lbl_time = tk.Label(self.right_frame, text=time_text, bg=self.default_bg, fg=time_fg,
+                                font=('Segoe UI', 9))
+        self.lbl_time.pack(side=tk.RIGHT, padx=(10, 0))
+        
+        # Actions Frame (Hidden by default)
+        self.actions_frame = tk.Frame(self.right_frame, bg=self.default_bg)
+        # Don't pack initially
+        
+        # Copy Button
+        self.btn_copy = tk.Label(self.actions_frame, text="❐", bg=self.default_bg, fg=COLORS['text_gray'],
+                                cursor="hand2", font=('Segoe UI', 10))
+        self.btn_copy.pack(side=tk.LEFT, padx=5)
+        self.btn_copy.bind("<Button-1>", self.copy_to_clipboard)
+        
+        # Delete Button
+        self.btn_delete = tk.Label(self.actions_frame, text="🗑", bg=self.default_bg, fg=COLORS['text_gray'],
+                                  cursor="hand2", font=('Segoe UI', 10))
+        self.btn_delete.pack(side=tk.LEFT, padx=5)
+        self.btn_delete.bind("<Button-1>", lambda e: self.delete_callback(self.index))
+        
+        # Bindings for Hover
+        self.bind("<Enter>", self.on_enter)
+        self.bind("<Leave>", self.on_leave)
+        
+        # Bind children to propagate hover
+        for widget in [self.lbl_title, self.lbl_time, self.right_frame, self.dot_canvas]:
+            widget.bind("<Enter>", self.on_enter)
+            widget.bind("<Leave>", self.on_leave)
+            
+        # Click to load
+        self.bind("<Button-1>", lambda e: self.load_callback(url))
+        self.lbl_title.bind("<Button-1>", lambda e: self.load_callback(url))
+        self.dot_canvas.bind("<Button-1>", lambda e: self.load_callback(url))
+
+    def on_enter(self, event):
+        self.config(bg=self.hover_bg)
+        self.lbl_title.config(bg=self.hover_bg)
+        self.lbl_time.config(bg=self.hover_bg)
+        self.right_frame.config(bg=self.hover_bg)
+        self.actions_frame.config(bg=self.hover_bg)
+        self.btn_copy.config(bg=self.hover_bg)
+        self.btn_delete.config(bg=self.hover_bg)
+        self.dot_canvas.config(bg=self.hover_bg)
+        
+        # Show actions, hide time (or show both? Image shows time AND actions)
+        # Image shows: [Title] ... [Time] [Copy] [Delete]
+        # So we pack actions to the LEFT of time, or just pack them in right_frame
+        
+        # Re-pack logic for right frame
+        self.lbl_time.pack_forget()
+        self.actions_frame.pack(side=tk.RIGHT, padx=(10, 0))
+        self.lbl_time.pack(side=tk.RIGHT, padx=(10, 0))
+
+    def on_leave(self, event):
+        # Check if mouse is still inside the widget
+        x, y = self.winfo_pointerxy()
+        widget_x = self.winfo_rootx()
+        widget_y = self.winfo_rooty()
+        width = self.winfo_width()
+        height = self.winfo_height()
+        
+        if not (widget_x <= x <= widget_x + width and widget_y <= y <= widget_y + height):
+            self.config(bg=self.default_bg)
+            self.lbl_title.config(bg=self.default_bg)
+            self.lbl_time.config(bg=self.default_bg)
+            self.right_frame.config(bg=self.default_bg)
+            self.actions_frame.config(bg=self.default_bg)
+            self.btn_copy.config(bg=self.default_bg)
+            self.btn_delete.config(bg=self.default_bg)
+            self.dot_canvas.config(bg=self.default_bg)
+            
+            self.actions_frame.pack_forget()
+            
+    def copy_to_clipboard(self, event):
+        self.clipboard_clear()
+        self.clipboard_append(self.item_data.get('url', ''))
+        # Optional: Flash feedback
+
 class HistoryPanel(tk.Frame):
     def __init__(self, master, load_callback, delete_callback, clear_callback):
         super().__init__(master, bg=COLORS['bg'])
@@ -128,52 +293,33 @@ class HistoryPanel(tk.Frame):
         header = tk.Frame(self, bg=COLORS['header_bg'])
         header.pack(fill=tk.X)
         
-        tk.Label(header, text="History", bg=COLORS['header_bg'], fg=COLORS['text'], font=('Segoe UI', 10, 'bold')).pack(side=tk.LEFT, padx=5, pady=2)
+        tk.Label(header, text="History", bg=COLORS['header_bg'], fg=COLORS['text'], font=('Segoe UI', 10, 'bold')).pack(side=tk.LEFT, padx=10, pady=8)
         
-        StyledButton(header, text="Clear All", command=self.clear_callback, font=('Segoe UI', 8)).pack(side=tk.RIGHT, padx=5, pady=2)
+        StyledButton(header, text="Clear All", command=self.clear_callback, font=('Segoe UI', 8)).pack(side=tk.RIGHT, padx=10, pady=8)
         
-        # Listbox with Scrollbar
-        list_frame = tk.Frame(self, bg=COLORS['bg'])
-        list_frame.pack(fill=tk.BOTH, expand=True)
+        # Separator
+        tk.Frame(self, bg="#333333", height=1).pack(fill=tk.X)
         
-        self.scrollbar = tk.Scrollbar(list_frame)
-        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        self.listbox = tk.Listbox(list_frame, bg=COLORS['list_bg'], fg=COLORS['text'],
-                                 selectbackground=COLORS['button_active'], selectforeground=COLORS['text'],
-                                 relief=tk.FLAT, bd=0, yscrollcommand=self.scrollbar.set,
-                                 font=('Segoe UI', 9))
-        self.listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.scrollbar.config(command=self.listbox.yview)
-        
-        # Bindings
-        self.listbox.bind('<Double-Button-1>', self.on_double_click)
-        self.listbox.bind('<Delete>', self.on_delete_key)
+        # Scrollable List
+        self.list_container = ScrollableFrame(self, bg=COLORS['bg'])
+        self.list_container.pack(fill=tk.BOTH, expand=True)
         
     def update_history(self, history_items):
-        self.listbox.delete(0, tk.END)
-        for item in history_items:
-            name = item.get('title') or item['url']
-            if len(name) > 80: name = name[:77] + "..."
-            self.listbox.insert(tk.END, f" {name}")
+        # Clear existing items
+        for widget in self.list_container.scrollable_frame.winfo_children():
+            widget.destroy()
             
-    def on_double_click(self, event):
-        selection = self.listbox.curselection()
-        if selection:
-            # Get full URL from history data (not just the display text)
-            # This requires the parent to handle the mapping, but for now we assume the index matches
-            # A better way is to pass the full history list to this component
-            from .utils import load_history # Import here to avoid circular dependency if possible, or pass data
-            history = load_history()
-            if 0 <= selection[0] < len(history):
-                url = history[selection[0]]['url']
-                self.load_callback(url)
-
-    def on_delete_key(self, event):
-        selection = self.listbox.curselection()
-        if selection:
-            index = selection[0]
-            self.delete_callback(index)
+        # Populate
+        for i, item in enumerate(history_items):
+            row = HistoryItemRow(self.list_container.scrollable_frame, item, 
+                               self.load_callback, self.delete_callback, i,
+                               bg=COLORS['bg'])
+            row.pack(fill=tk.X, expand=True)
+            # Bind mouse scroll to row and its children
+            self.list_container.bind_mouse_scroll(row)
+            self.list_container.bind_mouse_scroll(row.lbl_title)
+            self.list_container.bind_mouse_scroll(row.right_frame)
+            self.list_container.bind_mouse_scroll(row.lbl_time)
 
 class LoadingSpinner:
     def __init__(self, parent, size=60, color="white", bg_color="black", root_window=None):

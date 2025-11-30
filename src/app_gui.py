@@ -136,7 +136,8 @@ class M3U8StreamingPlayer:
         self.menu_bar.pack(side=tk.TOP, fill=tk.X)
         
         # Separator Line
-        tk.Frame(self.root, bg=COLORS['button_active'], height=1).pack(side=tk.TOP, fill=tk.X)
+        self.menu_separator = tk.Frame(self.root, bg=COLORS['button_active'], height=1)
+        self.menu_separator.pack(side=tk.TOP, fill=tk.X)
         
         # Left: Menu Buttons
         self.menu_left = tk.Frame(self.menu_bar, bg=COLORS['menu_bg'])
@@ -276,6 +277,9 @@ class M3U8StreamingPlayer:
         
         PrimaryButton(url_frame, text="Load Stream", command=self.load_and_play_stream).pack(side=tk.RIGHT)
         
+        # History Toggle (Moved here)
+        StyledButton(url_frame, text="🕒", command=self.toggle_history, width=3, font=('Segoe UI', 10), bg_color=COLORS['bg']).pack(side=tk.RIGHT, padx=(0, 5))
+        
         # Row 2: Referer + User Agent (side by side)
         row2 = tk.Frame(self.config_panel, bg=COLORS['bg'])
         row2.pack(fill=tk.X)
@@ -348,8 +352,8 @@ class M3U8StreamingPlayer:
         # Skip Forward
         StyledButton(controls_right, text="⏭", command=lambda: self.skip(10), width=3, font=('Segoe UI', 12)).pack(side=tk.LEFT, padx=2)
         
-        # History Toggle
-        StyledButton(controls_right, text="🕒", command=self.toggle_history, width=3, font=('Segoe UI', 12)).pack(side=tk.LEFT, padx=2)
+        # History Toggle (Removed)
+        # StyledButton(controls_right, text="🕒", command=self.toggle_history, width=3, font=('Segoe UI', 12)).pack(side=tk.LEFT, padx=2)
         
         # Volume Group
         vol_frame = tk.Frame(controls_right, bg=COLORS['control_bg'])
@@ -451,7 +455,8 @@ class M3U8StreamingPlayer:
         self.show_history = not self.show_history
         if self.show_history:
             self.history_panel.pack(side=tk.BOTTOM, fill=tk.X)
-            self.history_panel.listbox.focus_set()
+            self.history_panel.pack(side=tk.BOTTOM, fill=tk.X)
+            # self.history_panel.listbox.focus_set() # Removed as listbox no longer exists
         else:
             self.history_panel.pack_forget()
 
@@ -817,6 +822,7 @@ class M3U8StreamingPlayer:
         # Hide menu
         # Hide menu bar
         self.menu_bar.pack_forget()
+        self.menu_separator.pack_forget()
         
         # Remove borders for clean look
         self.video_frame.config(bd=0, relief=tk.FLAT)
@@ -856,6 +862,7 @@ class M3U8StreamingPlayer:
         # Restore menu
         # Restore menu bar
         self.menu_bar.pack(side=tk.TOP, fill=tk.X, before=self.main_container)
+        self.menu_separator.pack(side=tk.TOP, fill=tk.X, before=self.main_container)
         
         # Restore panels if they were enabled
         if self.show_config:

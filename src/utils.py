@@ -1,6 +1,8 @@
 import json
 import os
 from datetime import datetime
+import time
+from urllib.parse import urlparse, parse_qs
 
 HISTORY_FILE = "history.json"
 SETTINGS_FILE = "settings.json"
@@ -17,6 +19,56 @@ def format_time(secs):
     m = (secs % 3600) // 60
     s = secs % 60
     return f"{h:02d}:{m:02d}:{s:02d}"
+
+def extract_expiration(url):
+    """Extract expiration timestamp from URL."""
+    try:
+        parsed = urlparse(url)
+        params = parse_qs(parsed.query)
+        # Check common expiration parameters
+        for key in ['expires', 'exp', 'expiration']:
+            if key in params:
+                return int(params[key][0])
+    except:
+        pass
+    return None
+
+def get_remaining_time(timestamp):
+    """Calculate remaining time until expiration in HH:MM format."""
+    if not timestamp:
+        return None
+        
+    try:
+        now = time.time()
+        diff = timestamp - now
+        
+        if diff <= 0:
+            return "Expired"
+            
+        h = int(diff // 3600)
+        m = int((diff % 3600) // 60)
+        
+        return f"{h:02d}:{m:02d}"
+    except:
+        return None
+
+def get_status_color(timestamp):
+    """Get status color based on remaining time."""
+    if not timestamp:
+        return None # Default color
+        
+    try:
+        now = time.time()
+        diff = timestamp - now
+        
+        if diff <= 0:
+            return "#666666" # Grey (Expired)
+        elif diff < 3 * 3600: # Less than 3 hours
+            return "#FFC107" # Amber/Yellow
+        else:
+            return "#4CAF50" # Green
+    except:
+        return None
 
 def load_history():
     """Load playback history from JSON file."""
