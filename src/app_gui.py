@@ -72,6 +72,9 @@ class M3U8StreamingPlayer:
         
         # Load History
         self.refresh_history()
+        
+        # Remove focus from buttons on startup
+        self.root.focus_set()
 
     def setup_styles(self):
         style = ttk.Style()
@@ -131,6 +134,9 @@ class M3U8StreamingPlayer:
         # Custom Menu Bar Container
         self.menu_bar = tk.Frame(self.root, bg=COLORS['menu_bg'])
         self.menu_bar.pack(side=tk.TOP, fill=tk.X)
+        
+        # Separator Line
+        tk.Frame(self.root, bg=COLORS['button_active'], height=1).pack(side=tk.TOP, fill=tk.X)
         
         # Left: Menu Buttons
         self.menu_left = tk.Frame(self.menu_bar, bg=COLORS['menu_bg'])
@@ -244,12 +250,6 @@ class M3U8StreamingPlayer:
                         font=('Segoe UI', 11))
         text1.pack()
         
-        text2 = tk.Label(self.placeholder_frame, 
-                        text="Or drag and drop an M3U8 file here",
-                        bg=COLORS['video_bg'], fg=COLORS['text_gray'],
-                        font=('Segoe UI', 10))
-        text2.pack(pady=(4, 0))
-
     def setup_config_panel(self):
         self.config_panel = tk.Frame(self.player_area, bg=COLORS['bg'], relief=tk.FLAT, bd=0)
         self.config_panel.pack(fill=tk.X, padx=10, pady=10)
@@ -258,10 +258,11 @@ class M3U8StreamingPlayer:
         row1 = tk.Frame(self.config_panel, bg=COLORS['bg'])
         row1.pack(fill=tk.X, pady=(0, 8))
         
-        tk.Label(row1, text="Stream URL", bg=COLORS['bg'], fg=COLORS['text_gray'], font=('Segoe UI', 9)).pack(anchor=tk.W, pady=(0, 4))
+        # Label inline
+        tk.Label(row1, text="Stream URL:", bg=COLORS['bg'], fg=COLORS['text_gray'], font=('Segoe UI', 9), width=10, anchor=tk.W).pack(side=tk.LEFT, padx=(0, 8))
         
         url_frame = tk.Frame(row1, bg=COLORS['bg'])
-        url_frame.pack(fill=tk.X)
+        url_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
         self.url_entry = tk.Entry(url_frame, font=('Segoe UI', 10), bg=COLORS['entry_bg'], fg=COLORS['entry_fg'], 
                                  insertbackground=COLORS['text'], relief=tk.FLAT, bd=1)
@@ -273,8 +274,7 @@ class M3U8StreamingPlayer:
         self.url_entry.bind('<FocusIn>', self._on_url_focus_in)
         self.url_entry.bind('<FocusOut>', self._on_url_focus_out)
         
-        PrimaryButton(url_frame, text="Load Stream", command=self.load_and_play_stream, 
-                     font=('Segoe UI', 10, 'bold')).pack(side=tk.RIGHT, ipady=6, ipadx=16)
+        PrimaryButton(url_frame, text="Load Stream", command=self.load_and_play_stream).pack(side=tk.RIGHT)
         
         # Row 2: Referer + User Agent (side by side)
         row2 = tk.Frame(self.config_panel, bg=COLORS['bg'])
@@ -284,21 +284,21 @@ class M3U8StreamingPlayer:
         ref_frame = tk.Frame(row2, bg=COLORS['bg'])
         ref_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 8))
         
-        tk.Label(ref_frame, text="Referer", bg=COLORS['bg'], fg=COLORS['text_gray'], font=('Segoe UI', 9)).pack(anchor=tk.W, pady=(0, 4))
+        tk.Label(ref_frame, text="Referer:", bg=COLORS['bg'], fg=COLORS['text_gray'], font=('Segoe UI', 9), width=10, anchor=tk.W).pack(side=tk.LEFT, padx=(0, 8))
         self.referer_entry = tk.Entry(ref_frame, font=('Segoe UI', 9), bg=COLORS['entry_bg'], fg=COLORS['entry_fg'], 
                                      insertbackground=COLORS['text'], relief=tk.FLAT, bd=1)
         self.referer_entry.insert(0, "https://www.patreon.com")
-        self.referer_entry.pack(fill=tk.X, ipady=4)
+        self.referer_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=4)
         
         # User Agent (right half)
         ua_frame = tk.Frame(row2, bg=COLORS['bg'])
         ua_frame.pack(side=tk.RIGHT, fill=tk.X, expand=True)
         
-        tk.Label(ua_frame, text="User Agent", bg=COLORS['bg'], fg=COLORS['text_gray'], font=('Segoe UI', 9)).pack(anchor=tk.W, pady=(0, 4))
+        tk.Label(ua_frame, text="User Agent:", bg=COLORS['bg'], fg=COLORS['text_gray'], font=('Segoe UI', 9)).pack(side=tk.LEFT, padx=(0, 8))
         self.ua_var = tk.StringVar(value="Chrome")
         ua_combo = ttk.Combobox(ua_frame, textvariable=self.ua_var, values=list(USER_AGENTS.keys()), 
-                               state="readonly", font=('Segoe UI', 9))
-        ua_combo.pack(fill=tk.X)
+                                state="readonly", font=('Segoe UI', 9))
+        ua_combo.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
     def copy_url(self):
         if self.current_url:
@@ -343,11 +343,13 @@ class M3U8StreamingPlayer:
         
         # Play/Pause (Blue Accent)
         self.play_btn = StyledButton(controls_right, text="▶", command=self.toggle_play_pause, width=3, font=('Segoe UI', 12))
-        self.play_btn.config(bg=COLORS['accent'], activebackground=COLORS['load_btn_active'])
         self.play_btn.pack(side=tk.LEFT, padx=8)
         
         # Skip Forward
         StyledButton(controls_right, text="⏭", command=lambda: self.skip(10), width=3, font=('Segoe UI', 12)).pack(side=tk.LEFT, padx=2)
+        
+        # History Toggle
+        StyledButton(controls_right, text="🕒", command=self.toggle_history, width=3, font=('Segoe UI', 12)).pack(side=tk.LEFT, padx=2)
         
         # Volume Group
         vol_frame = tk.Frame(controls_right, bg=COLORS['control_bg'])

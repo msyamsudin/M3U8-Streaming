@@ -24,28 +24,98 @@ class StyledButton(tk.Button):
         if self['state'] != 'disabled':
             self['bg'] = COLORS['control_bg']
 
-class PrimaryButton(StyledButton):
-    def __init__(self, master, **kwargs):
-        super().__init__(master, **kwargs)
-        # Use colors from config
-        self.bg_normal = COLORS.get('load_btn_bg', '#007ACC')
-        self.bg_hover = COLORS.get('load_btn_hover', '#0098FF')
-        self.bg_active = COLORS.get('load_btn_active', '#005FA3')
+class RoundedButton(tk.Canvas):
+    def __init__(self, master, text="", command=None, width=120, height=35, corner_radius=10, 
+                 bg="white", fg="black", hover_bg="#eeeeee", active_bg="#cccccc", **kwargs):
+        super().__init__(master, width=width, height=height, bg=master['bg'], highlightthickness=0, **kwargs)
         
-        self.config(
-            bg=self.bg_normal,
-            fg=COLORS.get('load_btn_fg', '#ffffff'),
-            activebackground=self.bg_active,
-            activeforeground=COLORS.get('load_btn_fg', '#ffffff')
-        )
+        self.command = command
+        self.text = text
+        self.corner_radius = corner_radius
+        self.bg_normal = bg
+        self.fg_normal = fg
+        self.bg_hover = hover_bg
+        self.bg_active = active_bg
         
+        self.current_bg = self.bg_normal
+        self.is_pressed = False
+        
+        self.bind("<Enter>", self.on_enter)
+        self.bind("<Leave>", self.on_leave)
+        self.bind("<Button-1>", self.on_press)
+        self.bind("<ButtonRelease-1>", self.on_release)
+        
+        self.draw()
+        
+    def draw(self):
+        self.delete("all")
+        w = int(self['width'])
+        h = int(self['height'])
+        r = self.corner_radius
+        
+        # Draw rounded rectangle
+        self.create_rounded_rect(0, 0, w, h, r, fill=self.current_bg, outline="")
+        
+        # Draw text
+        self.create_text(w/2, h/2, text=self.text, fill=self.fg_normal, font=('Segoe UI', 10, 'bold'))
+        
+    def create_rounded_rect(self, x1, y1, x2, y2, r, **kwargs):
+        points = [
+            x1+r, y1,
+            x1+r, y1,
+            x2-r, y1,
+            x2-r, y1,
+            x2, y1,
+            x2, y1+r,
+            x2, y1+r,
+            x2, y2-r,
+            x2, y2-r,
+            x2, y2,
+            x2-r, y2,
+            x2-r, y2,
+            x1+r, y2,
+            x1+r, y2,
+            x1, y2,
+            x1, y2-r,
+            x1, y2-r,
+            x1, y1+r,
+            x1, y1+r,
+            x1, y1
+        ]
+        return self.create_polygon(points, smooth=True, **kwargs)
+
     def on_enter(self, e):
-        if self['state'] != 'disabled':
-            self['bg'] = self.bg_hover
+        self.current_bg = self.bg_hover
+        self.draw()
 
     def on_leave(self, e):
-        if self['state'] != 'disabled':
-            self['bg'] = self.bg_normal
+        self.current_bg = self.bg_normal
+        self.is_pressed = False
+        self.draw()
+
+    def on_press(self, e):
+        self.is_pressed = True
+        self.current_bg = self.bg_active
+        self.draw()
+
+    def on_release(self, e):
+        if self.is_pressed:
+            self.is_pressed = False
+            self.current_bg = self.bg_hover
+            self.draw()
+            if self.command:
+                self.command()
+
+class PrimaryButton(RoundedButton):
+    def __init__(self, master, text="", command=None, **kwargs):
+        bg_normal = COLORS.get('load_btn_bg', '#007ACC')
+        bg_hover = COLORS.get('load_btn_hover', '#0098FF')
+        bg_active = COLORS.get('load_btn_active', '#005FA3')
+        fg = COLORS.get('load_btn_fg', '#ffffff')
+        
+        super().__init__(master, text=text, command=command, 
+                        bg=bg_normal, fg=fg, hover_bg=bg_hover, active_bg=bg_active,
+                        width=120, height=32, corner_radius=16, **kwargs)
 
 class HistoryPanel(tk.Frame):
     def __init__(self, master, load_callback, delete_callback, clear_callback):
