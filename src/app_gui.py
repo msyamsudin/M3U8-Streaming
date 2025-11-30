@@ -122,6 +122,7 @@ class M3U8StreamingPlayer:
         self.root.bind("<space>", lambda e: self.toggle_play_pause())
         self.root.bind("<Control-o>", lambda e: self.show_open_dialog())
         self.root.bind("<Control-O>", lambda e: self.show_open_dialog())
+        self.root.bind("<F1>", lambda e: self.show_shortcuts_dialog())
         self.root.bind("<Configure>", self.on_window_resize)
         
         # Video Canvas Bindings
@@ -177,6 +178,18 @@ class M3U8StreamingPlayer:
         view_menu.add_cascade(label="Control Layout", menu=layout_menu)
         
         self.view_btn.config(menu=view_menu)
+
+        # Help Menu
+        self.help_btn = tk.Menubutton(self.menu_left, text="Help", bg=COLORS['menu_bg'], fg=COLORS['text'],
+                                     activebackground=COLORS['button_hover'], activeforeground=COLORS['text'],
+                                     bd=0, relief=tk.FLAT, font=('Segoe UI', 9))
+        self.help_btn.pack(side=tk.LEFT, padx=2)
+        
+        help_menu = Menu(self.help_btn, tearoff=0, bg=COLORS['menu_bg'], fg=COLORS['text'])
+        help_menu.add_command(label="Keyboard Shortcuts (F1)", command=self.show_shortcuts_dialog)
+        help_menu.add_separator()
+        help_menu.add_command(label="About", command=self.show_about_dialog)
+        self.help_btn.config(menu=help_menu)
 
 
         
@@ -915,6 +928,127 @@ class M3U8StreamingPlayer:
     def on_window_resize(self, event):
         # No longer needed to reparent player
         pass
+
+    def show_shortcuts_dialog(self):
+        """Display keyboard shortcuts dialog"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Keyboard Shortcuts")
+        dialog.geometry("500x600")
+        dialog.configure(bg=COLORS['bg'])
+        dialog.resizable(False, False)
+        
+        # Make it modal
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # Center the dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (500 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (600 // 2)
+        dialog.geometry(f"+{x}+{y}")
+        
+        # Header
+        header = tk.Frame(dialog, bg=COLORS['header_bg'])
+        header.pack(fill=tk.X, pady=(0, 10))
+        tk.Label(header, text="⌨️ Keyboard Shortcuts", bg=COLORS['header_bg'], fg=COLORS['text'],
+                font=('Segoe UI', 12, 'bold')).pack(pady=15, padx=20, anchor=tk.W)
+        
+        # Shortcuts list
+        shortcuts_frame = tk.Frame(dialog, bg=COLORS['bg'])
+        shortcuts_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
+        
+        shortcuts = [
+            ("Playback", ""),
+            ("Space", "Play / Pause"),
+            ("→ (Right Arrow)", "Skip Forward 10 seconds"),
+            ("← (Left Arrow)", "Skip Backward 10 seconds"),
+            ("", ""),
+            ("View", ""),
+            ("F", "Toggle Fullscreen"),
+            ("Escape", "Exit Fullscreen"),
+            ("H", "Toggle History Panel"),
+            ("", ""),
+            ("Video Controls", ""),
+            ("Single Click", "Play / Pause (on video)"),
+            ("Double Click", "Toggle Fullscreen (on video)"),
+            ("", ""),
+            ("Other", ""),
+            ("Ctrl+O", "Open Stream URL Dialog"),
+            ("F1", "Show Keyboard Shortcuts"),
+        ]
+        
+        for key, action in shortcuts:
+            row = tk.Frame(shortcuts_frame, bg=COLORS['bg'])
+            row.pack(fill=tk.X, pady=2)
+            
+            if not action:  # Category header
+                if key:  # Skip empty rows
+                    tk.Label(row, text=key, bg=COLORS['bg'], fg=COLORS['accent'],
+                            font=('Segoe UI', 10, 'bold'), anchor=tk.W).pack(side=tk.LEFT)
+            else:
+                # Key
+                key_label = tk.Label(row, text=key, bg=COLORS['button_bg'], fg=COLORS['text'],
+                                    font=('Consolas', 9), width=20, anchor=tk.W, padx=8, pady=4)
+                key_label.pack(side=tk.LEFT, padx=(0, 10))
+                
+                # Action
+                tk.Label(row, text=action, bg=COLORS['bg'], fg=COLORS['text_gray'],
+                        font=('Segoe UI', 9), anchor=tk.W).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        # Close button
+        btn_frame = tk.Frame(dialog, bg=COLORS['bg'])
+        btn_frame.pack(fill=tk.X, padx=20, pady=(0, 20))
+        
+        from .ui_components import PrimaryButton
+        close_btn = PrimaryButton(btn_frame, text="Close", command=dialog.destroy)
+        close_btn.pack(side=tk.RIGHT)
+        
+        # Bind Escape to close
+        dialog.bind("<Escape>", lambda e: dialog.destroy())
+        
+    def show_about_dialog(self):
+        """Display about dialog"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("About")
+        dialog.geometry("400x300")
+        dialog.configure(bg=COLORS['bg'])
+        dialog.resizable(False, False)
+        
+        # Make it modal
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # Center the dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (400 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (300 // 2)
+        dialog.geometry(f"+{x}+{y}")
+        
+        # Content
+        content = tk.Frame(dialog, bg=COLORS['bg'])
+        content.pack(fill=tk.BOTH, expand=True, padx=30, pady=30)
+        
+        # App Icon/Title
+        tk.Label(content, text="▶", bg=COLORS['bg'], fg=COLORS['accent'],
+                font=('Segoe UI', 48)).pack(pady=(0, 10))
+        
+        tk.Label(content, text="M3U8 Streaming Player", bg=COLORS['bg'], fg=COLORS['text'],
+                font=('Segoe UI', 14, 'bold')).pack(pady=(0, 5))
+        
+        tk.Label(content, text="Version 1.0.0", bg=COLORS['bg'], fg=COLORS['text_gray'],
+                font=('Segoe UI', 9)).pack(pady=(0, 20))
+        
+        tk.Label(content, text="A powerful and modern M3U8 stream player\nwith advanced playback controls.",
+                bg=COLORS['bg'], fg=COLORS['text_gray'],
+                font=('Segoe UI', 9), justify=tk.CENTER).pack(pady=(0, 20))
+        
+        # Close button
+        from .ui_components import PrimaryButton
+        close_btn = PrimaryButton(content, text="Close", command=dialog.destroy)
+        close_btn.pack()
+        
+        # Bind Escape to close
+        dialog.bind("<Escape>", lambda e: dialog.destroy())
 
     def on_closing(self):
         self.is_closing = True
