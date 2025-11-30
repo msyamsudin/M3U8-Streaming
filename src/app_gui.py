@@ -196,6 +196,12 @@ class M3U8StreamingPlayer:
         self.status_label = tk.Label(self.menu_right, text="Ready", bg=COLORS['menu_bg'], fg=COLORS['status_ready_fg'], font=('Segoe UI', 9))
         self.status_label.pack(side=tk.LEFT)
 
+        # Separator 2
+        tk.Label(self.menu_right, text="|", bg=COLORS['menu_bg'], fg=COLORS['text_gray'], font=('Segoe UI', 9)).pack(side=tk.LEFT, padx=5)
+
+        # History Button
+        StyledButton(self.menu_right, text="🕒", command=self.toggle_history, width=3, font=('Segoe UI', 9), bg_color=COLORS['menu_bg']).pack(side=tk.LEFT, padx=(0, 5))
+
     def setup_ui(self):
         # Main container (Horizontal for History Panel)
         self.main_container = tk.Frame(self.root, bg=COLORS['bg'])
@@ -276,9 +282,6 @@ class M3U8StreamingPlayer:
         self.url_entry.bind('<FocusOut>', self._on_url_focus_out)
         
         PrimaryButton(url_frame, text="Load Stream", command=self.load_and_play_stream).pack(side=tk.RIGHT)
-        
-        # History Toggle (Moved here)
-        StyledButton(url_frame, text="🕒", command=self.toggle_history, width=3, font=('Segoe UI', 10), bg_color=COLORS['bg']).pack(side=tk.RIGHT, padx=(0, 5))
         
         # Row 2: Referer + User Agent (side by side)
         row2 = tk.Frame(self.config_panel, bg=COLORS['bg'])
