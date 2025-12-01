@@ -359,21 +359,21 @@ class M3U8StreamingPlayer:
         controls_right.pack(side=tk.RIGHT, padx=(10, 0))
         
         # Skip Back
-        StyledButton(controls_right, text="⏮", command=lambda: self.skip(-10), width=3, font=('Segoe UI', 12)).pack(side=tk.LEFT, padx=2)
+        StyledButton(controls_right, text="⏮", command=lambda: self.skip(-10), width=4, font=('Segoe UI', 14)).pack(side=tk.LEFT, padx=2)
         
         # Play/Pause (Blue Accent)
-        self.play_btn = StyledButton(controls_right, text="▶", command=self.toggle_play_pause, width=3, font=('Segoe UI', 12))
+        self.play_btn = StyledButton(controls_right, text="▶", command=self.toggle_play_pause, width=4, font=('Segoe UI', 14))
         self.play_btn.pack(side=tk.LEFT, padx=8)
         
         # Skip Forward
-        StyledButton(controls_right, text="⏭", command=lambda: self.skip(10), width=3, font=('Segoe UI', 12)).pack(side=tk.LEFT, padx=2)
+        StyledButton(controls_right, text="⏭", command=lambda: self.skip(10), width=4, font=('Segoe UI', 14)).pack(side=tk.LEFT, padx=2)
         
         # Volume Group
         self.vol_frame = tk.Frame(controls_right, bg=COLORS['control_bg'])
         self.vol_frame.pack(side=tk.LEFT, padx=(15, 0))
         
-        self.mute_btn = StyledButton(self.vol_frame, text="🔊", command=self.toggle_mute, width=2)
-        self.mute_btn.pack(side=tk.LEFT)
+        self.mute_btn = StyledButton(self.vol_frame, text="🔊", command=self.toggle_mute, width=3, font=('Segoe UI', 14))
+        self.mute_btn.pack(side=tk.LEFT, pady=(0, 6))
         
         # Volume Slider Container for Animation
         self.vol_target_width = 130  # Target width for slider + label
@@ -399,7 +399,7 @@ class M3U8StreamingPlayer:
             widget.bind("<Leave>", self.on_volume_leave)
         
         # Fullscreen
-        StyledButton(controls_right, text="⛶", command=self.toggle_fullscreen, width=3).pack(side=tk.LEFT, padx=(10, 0))
+        StyledButton(controls_right, text="⛶", command=self.toggle_fullscreen, width=4, font=('Segoe UI', 14)).pack(side=tk.LEFT, padx=(10, 0))
         # We pack this last with fill=tk.X and expand=True
         seek_frame = tk.Frame(self.ctrl_frame, bg=COLORS['control_bg'])
         seek_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
