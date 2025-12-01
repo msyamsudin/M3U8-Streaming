@@ -368,30 +368,38 @@ class M3U8StreamingPlayer:
         # Skip Forward
         StyledButton(controls_right, text="⏭", command=lambda: self.skip(10), width=3, font=('Segoe UI', 12)).pack(side=tk.LEFT, padx=2)
         
-        # History Toggle (Removed)
-        # StyledButton(controls_right, text="🕒", command=self.toggle_history, width=3, font=('Segoe UI', 12)).pack(side=tk.LEFT, padx=2)
-        
         # Volume Group
-        vol_frame = tk.Frame(controls_right, bg=COLORS['control_bg'])
-        vol_frame.pack(side=tk.LEFT, padx=(15, 0))
+        self.vol_frame = tk.Frame(controls_right, bg=COLORS['control_bg'])
+        self.vol_frame.pack(side=tk.LEFT, padx=(15, 0))
         
-        self.mute_btn = StyledButton(vol_frame, text="🔊", command=self.toggle_mute, width=2)
+        self.mute_btn = StyledButton(self.vol_frame, text="🔊", command=self.toggle_mute, width=2)
         self.mute_btn.pack(side=tk.LEFT)
         
+        # Volume Slider Container for Animation
+        self.vol_target_width = 130  # Target width for slider + label
+        self.vol_anim_job = None
+        
+        self.vol_slider_container = tk.Frame(self.vol_frame, bg=COLORS['control_bg'], width=0, height=25)
+        self.vol_slider_container.pack_propagate(False) # Important for manual width control
+        self.vol_slider_container.pack(side=tk.LEFT, padx=0) # Start hidden (width=0)
+
         self.volume_var = tk.IntVar(value=100)
         # Use BufferedScale for volume
-        self.volume_scale = BufferedScale(vol_frame, command=self.on_volume_change, width=80, height=20)
+        self.volume_scale = BufferedScale(self.vol_slider_container, command=self.on_volume_change, width=80, height=20)
         self.volume_scale.set_progress(100)
-        self.volume_scale.pack(side=tk.LEFT, padx=5)
+        self.volume_scale.pack(side=tk.LEFT, padx=5, pady=2)
         
-        self.volume_label = tk.Label(vol_frame, text="100%", bg=COLORS['control_bg'], 
+        self.volume_label = tk.Label(self.vol_slider_container, text="100%", bg=COLORS['control_bg'], 
                                      fg=COLORS['text_gray'], font=('Segoe UI', 9), width=4)
         self.volume_label.pack(side=tk.LEFT, padx=(0, 5))
+
+        # Bind hover events
+        for widget in [self.vol_frame, self.mute_btn, self.volume_scale, self.volume_label, self.vol_slider_container]:
+            widget.bind("<Enter>", self.on_volume_enter)
+            widget.bind("<Leave>", self.on_volume_leave)
         
         # Fullscreen
         StyledButton(controls_right, text="⛶", command=self.toggle_fullscreen, width=3).pack(side=tk.LEFT, padx=(10, 0))
-
-        # 3. Seekbar (Middle - Fills remaining space)
         # We pack this last with fill=tk.X and expand=True
         seek_frame = tk.Frame(self.ctrl_frame, bg=COLORS['control_bg'])
         seek_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
@@ -743,6 +751,63 @@ class M3U8StreamingPlayer:
             # Hide speed indicator when not playing
             self.speed_label.config(text="")
         self.root.after(1000, self.update_player_info)
+
+    def on_volume_enter(self, event):
+        if self.volume_hide_timer:
+            self.root.after_cancel(self.volume_hide_timer)
+            self.volume_hide_timer = None
+        
+        # Animate open
+        self.animate_volume_width(self.vol_target_width)
+
+    def on_volume_leave(self, event):
+        if self.volume_hide_timer:
+            self.root.after_cancel(self.volume_hide_timer)
+        self.volume_hide_timer = self.root.after(300, self.hide_volume_controls)
+
+    def hide_volume_controls(self):
+        # Check if mouse is really outside the volume frame
+        x, y = self.root.winfo_pointerxy()
+        widget_x = self.vol_frame.winfo_rootx()
+        widget_y = self.vol_frame.winfo_rooty()
+        widget_w = self.vol_frame.winfo_width()
+        widget_h = self.vol_frame.winfo_height()
+        
+        # Add a small buffer/margin to prevent flickering at edges
+        margin = 10
+        if not (widget_x - margin <= x <= widget_x + widget_w + margin and 
+                widget_y - margin <= y <= widget_y + widget_h + margin):
+            # Animate close
+            self.animate_volume_width(0)
+
+    def animate_volume_width(self, target_width):
+        if self.vol_anim_job:
+            self.root.after_cancel(self.vol_anim_job)
+            self.vol_anim_job = None
+
+        current_width = self.vol_slider_container.winfo_width()
+        
+        if current_width == target_width:
+            return
+
+        # Determine step size for smooth animation
+        diff = target_width - current_width
+        step = diff / 5  # Move 1/5th of the distance each step
+        
+        if abs(step) < 1:
+            step = 1 if diff > 0 else -1
+            
+        new_width = int(current_width + step)
+        
+        # Snap to target if close enough
+        if (diff > 0 and new_width >= target_width) or (diff < 0 and new_width <= target_width):
+            new_width = target_width
+
+        self.vol_slider_container.config(width=new_width)
+        
+        if new_width != target_width:
+            self.vol_anim_job = self.root.after(10, lambda: self.animate_volume_width(target_width))
+
 
     # ------------------------------------------------------------------
     #  Click Handling
