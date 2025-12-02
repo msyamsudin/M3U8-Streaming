@@ -342,7 +342,7 @@ class M3U8StreamingPlayer:
         
         # Single Row Container
         self.ctrl_frame = tk.Frame(self.control_panel, bg=COLORS['control_bg'])
-        self.ctrl_frame.pack(fill=tk.X, padx=10, pady=10)
+        self.ctrl_frame.pack(fill=tk.X, padx=10, pady=5)
         
         # 1. Time (Left)
         time_frame = tk.Frame(self.ctrl_frame, bg=COLORS['control_bg'])
@@ -372,11 +372,11 @@ class M3U8StreamingPlayer:
         self.vol_frame = tk.Frame(controls_right, bg=COLORS['control_bg'])
         self.vol_frame.pack(side=tk.LEFT, padx=(15, 0))
         
-        self.mute_btn = StyledButton(self.vol_frame, text="🔊", command=self.toggle_mute, width=3, font=('Segoe UI', 14))
-        self.mute_btn.pack(side=tk.LEFT, pady=(0, 6))
+        self.mute_btn = StyledButton(self.vol_frame, text="🔊", command=self.toggle_mute, width=3, font=('Segoe UI', 15))
+        self.mute_btn.pack(side=tk.LEFT, pady=(0, 3))
         
         # Volume Slider Container for Animation
-        self.vol_target_width = 130  # Target width for slider + label
+        self.vol_target_width = 140  # Target width for slider + label
         self.vol_anim_job = None
         
         self.vol_slider_container = tk.Frame(self.vol_frame, bg=COLORS['control_bg'], width=0, height=25)

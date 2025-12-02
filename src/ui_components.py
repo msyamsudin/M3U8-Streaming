@@ -508,26 +508,40 @@ class BufferedScale(tk.Canvas):
         y1 = cy - (track_h / 2)
         y2 = cy + (track_h / 2)
         
+        # Padding for thumb radius
+        radius = 6
+        padding = radius + 1
+        
+        # Available width for track
+        track_w = w - (padding * 2)
+        if track_w < 0: track_w = 0
+        
         # Background track
-        self.create_rectangle(0, y1, w, y2, fill=COLORS['seekbar_bg'], outline="", tags="track")
+        self.create_rectangle(padding, y1, padding + track_w, y2, fill=COLORS['seekbar_bg'], outline="", tags="track")
         
         # Buffer track
         if self.buffer > 0:
-            bw = (self.buffer / 100) * w
-            self.create_rectangle(0, y1, bw, y2, fill=COLORS['text_gray'], outline="")
+            bw = (self.buffer / 100) * track_w
+            self.create_rectangle(padding, y1, padding + bw, y2, fill=COLORS['text_gray'], outline="")
             
         # Progress track
         if self.progress > 0:
-            pw = (self.progress / 100) * w
-            self.create_rectangle(0, y1, pw, y2, fill=COLORS['accent'], outline="")
+            pw = (self.progress / 100) * track_w
+            self.create_rectangle(padding, y1, padding + pw, y2, fill=COLORS['accent'], outline="")
             
             # Thumb (Circle)
-            radius = 6
-            tx1 = pw - radius
-            tx2 = pw + radius
+            tx1 = padding + pw - radius
+            tx2 = padding + pw + radius
             ty1 = cy - radius
             ty2 = cy + radius
             
+            self.create_oval(tx1, ty1, tx2, ty2, fill='white', outline=COLORS['accent'], width=1)
+        else:
+            # Draw thumb at 0 position
+            tx1 = padding - radius
+            tx2 = padding + radius
+            ty1 = cy - radius
+            ty2 = cy + radius
             self.create_oval(tx1, ty1, tx2, ty2, fill='white', outline=COLORS['accent'], width=1)
 
     def on_click(self, event):
@@ -545,9 +559,17 @@ class BufferedScale(tk.Canvas):
 
     def update_from_event(self, event):
         w = self.winfo_width()
-        if w > 0:
-            x = max(0, min(w, event.x))
-            self.progress = (x / w) * 100
+        radius = 6
+        padding = radius + 1
+        track_w = w - (padding * 2)
+        
+        if track_w > 0:
+            # Adjust x to be relative to the track start
+            x = event.x - padding
+            # Clamp x
+            x = max(0, min(track_w, x))
+            
+            self.progress = (x / track_w) * 100
             self.draw()
             # Optional: Call command while dragging for live seek
             # if self.command: self.command(self.progress)
