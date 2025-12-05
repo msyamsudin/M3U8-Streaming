@@ -452,6 +452,18 @@ class LoadingSpinner:
             self.draw()
             self.timer_id = self.parent.after(30, self.spin) # Faster smooth animation
 
+    def set_click_through(self, window):
+        if os.name == 'nt':
+            try:
+                from ctypes import windll
+                hwnd = windll.user32.GetParent(window.winfo_id())
+                GWL_EXSTYLE = -20
+                WS_EX_LAYERED = 0x00080000
+                WS_EX_TRANSPARENT = 0x00000020
+                style = windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+                windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED | WS_EX_TRANSPARENT)
+            except: pass
+
     def start(self):
         if not self.is_spinning:
             self.is_spinning = True
@@ -461,6 +473,7 @@ class LoadingSpinner:
             self.dimmer.overrideredirect(True)
             self.dimmer.config(bg='black')
             self.dimmer.attributes('-alpha', 0.5) # 50% opacity
+            self.set_click_through(self.dimmer)
             
             # 2. Create Spinner Window (Transparent)
             self.window = tk.Toplevel(self.parent)
@@ -473,6 +486,8 @@ class LoadingSpinner:
                 self.window.wm_attributes('-transparentcolor', self.chroma_key)
             except:
                 self.window.config(bg=self.bg_color)
+            
+            self.set_click_through(self.window)
             
             # Calculate position
             self.update_position()
