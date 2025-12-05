@@ -54,21 +54,29 @@ class M3U8StreamingPlayer:
         # Settings
         self.settings = load_settings()
 
-
-        # Initialize UI
-        # Initialize UI
+        # Initialize UI first (fast)
         self.setup_styles()
-        self.setup_title_bar()  # Initialize Custom Title Bar
-        self.setup_menu()       # Note: We might need to adjust menu to not double-up or look weird?
-                                # Standard menu bar usually sits below title bar.
+        self.setup_title_bar()
+        self.setup_menu()
         self.setup_ui()
         self.setup_bindings()
         
-        # Initialize Player
+        # Load History (fast)
+        self.refresh_history()
+        
+        # Remove focus from buttons on startup
+        self.root.focus_set()
+        
+        # Defer MPV initialization to after UI is displayed
+        self.root.after(100, self._init_player_async)
+    
+    def _init_player_async(self):
+        """Initialize MPV player after UI is ready for faster startup."""
         try:
             self.player = MpvPlayer(wid=self.video_canvas.winfo_id())
         except Exception as e:
             show_custom_error(self.root, "Error", str(e))
+            return
 
         # Bind MPV Mouse Events
         if self.player and self.player.mpv:
@@ -79,15 +87,9 @@ class M3U8StreamingPlayer:
             @self.player.mpv.key_binding('MOUSE_BTN0_DBL')
             def on_mpv_dbl_click(state=None, name=None, char=None):
                 self.root.after(0, self.handle_double_click)
-            
+        
         # Start periodic updates
         self.update_player_info()
-        
-        # Load History
-        self.refresh_history()
-        
-        # Remove focus from buttons on startup
-        self.root.focus_set()
 
     def setup_custom_window(self):
         """Remove Windows title bar but keep resizing and taskbar presence using ctypes."""
@@ -245,11 +247,8 @@ class M3U8StreamingPlayer:
         # Placeholder Overlay (shown when idle)
         self.setup_video_placeholder()
         
-        # Loading Spinner (Overlay)
+        # Loading Spinner
         self.spinner = LoadingSpinner(self.video_frame, size=60, color='#00FF00', bg_color=COLORS['video_bg'], root_window=self.root)
-        
-        # Top Overlay (Heart, Clock, Share)
-        # self.setup_overlay() # Removed as per request
         
         # Control Panel
         self.setup_control_panel()
@@ -416,29 +415,10 @@ class M3U8StreamingPlayer:
         # Initialize hidden/extra controls
         self.volume_hide_timer = None
         
-        # Quality/History (Hidden/Optional or moved?)
-        # The reference image doesn't explicitly show them in the main bar, 
-        # but we should probably keep them accessible or move them.
-        # For now, let's keep them but maybe less prominent or in a menu?
-        # The user asked to "Make it look like this", and the image doesn't show History/Quality buttons.
-        # However, removing functionality might be bad. Let's keep them but maybe integrate them better or just hide them if not in image?
-        # Actually, the user's previous request had them. The new image is cleaner.
-        # I will hide them from the main bar to match the image exactly, 
-        # but they are still accessible via shortcuts (H) or Menu.
-        # Or I can add them to the far right before fullscreen if space permits.
-        # Let's add them to the right group but keep them subtle.
-        
-        # Re-adding History/Quality to controls_right for functionality preservation
-        # StyledButton(controls_right, text="H", command=self.toggle_history, width=2).pack(side=tk.LEFT, padx=2)
-        
-        # Initialize Quality Combo (Hidden by default, used in logic)
+        # Quality Combo
         self.quality_var = tk.StringVar()
         self.quality_combo = ttk.Combobox(controls_right, textvariable=self.quality_var, state="readonly", width=10)
         self.quality_combo.bind("<<ComboboxSelected>>", self.on_quality_change)
-        # self.quality_combo.pack(side=tk.LEFT, padx=2) # Keep hidden to match reference
-        
-        # Actually, let's put Quality in the menu bar or keep it hidden until needed.
-        # History is toggleable via 'H'.
         
     def show_open_dialog(self):
         if self.show_config:
@@ -453,8 +433,6 @@ class M3U8StreamingPlayer:
         self.show_history = not self.show_history
         if self.show_history:
             self.history_panel.pack(side=tk.BOTTOM, fill=tk.X)
-            self.history_panel.pack(side=tk.BOTTOM, fill=tk.X)
-            # self.history_panel.listbox.focus_set() # Removed as listbox no longer exists
         else:
             self.history_panel.pack_forget()
 
@@ -595,8 +573,19 @@ class M3U8StreamingPlayer:
         if item and item.get('last_position', 0) > 5:
             pos = item['last_position']
             formatted = format_time(pos)
+            
+            # Pause player while user decides
+            if self.player and self.player.mpv:
+                self.player.mpv.pause = True
+                self.play_btn.config(text="▶")
+            
             if ask_custom_yes_no(self.root, "Resume Playback", f"Resume from {formatted}?"):
                 self._retry_seek(pos)
+            
+            # Resume playback after decision
+            if self.player and self.player.mpv:
+                self.player.mpv.pause = False
+                self.play_btn.config(text="⏸")
 
     def _retry_seek(self, pos, attempt=1):
         """Try to seek to the position, retrying if MPV is not ready."""
@@ -664,10 +653,6 @@ class M3U8StreamingPlayer:
         if self.player: self.player.seek(seconds)
 
     def on_seek_move(self, value):
-        # This is now handled internally by BufferedScale, but we might want to update the time label
-        # BufferedScale doesn't emit continuous events by default in my implementation above, 
-        # but let's assume we want to support it if we modify BufferedScale later.
-        # For now, this method might not be called directly by the new widget unless we bind it.
         pass
 
     def on_seek_end(self, value):
@@ -1105,9 +1090,6 @@ class M3U8StreamingPlayer:
         dialog.bind("<<CloseRequest>>", lambda e: dialog.destroy())
         
         # Content Frame
-        # Re-using 'dialog' variable context but we need to ensure content is packed into this frame
-        # However, the original code used 'dialog' directly.
-        # We need to wrap original content into a frame or change original pack calls.
         
         content_frame = tk.Frame(dialog, bg=COLORS['bg'])
         content_frame.pack(fill=tk.BOTH, expand=True, padx=1, pady=(0, 1))
