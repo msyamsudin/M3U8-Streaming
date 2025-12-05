@@ -417,8 +417,8 @@ class HistoryPanel(tk.Frame):
 
 class LoadingSpinner:
     """
-    Transparent rotating arc spinner using Toplevel overlay.
-    Arc floats directly over video with no visible background.
+    Transparent rotating arc spinner with speed indicator.
+    Shows during buffering with network speed below the spinner.
     """
     def __init__(self, parent, size=60, color="white", bg_color="black", root_window=None):
         self.parent = parent
@@ -428,7 +428,10 @@ class LoadingSpinner:
         self.timer_id = None
         self.window = None
         self.canvas = None
-        self.chroma_key = "#010101"  # Color to make transparent
+        self.speed_label = None
+        self.speed_text = ""
+        self.chroma_key = "#010101"
+        self.window_height = size + 25  # Extra space for speed label
         
     def _draw(self):
         """Draw the thin rotating arc."""
@@ -440,7 +443,7 @@ class LoadingSpinner:
         h = self.size
         padding = 6
         
-        # Draw shadow arc (for visibility on light video)
+        # Draw shadow arc
         self.canvas.create_arc(
             padding + 2, padding + 2, w - padding + 2, h - padding + 2,
             start=self.angle, extent=90,
@@ -472,10 +475,19 @@ class LoadingSpinner:
             pw = self.parent.winfo_width()
             ph = self.parent.winfo_height()
             x = px + (pw // 2) - (self.size // 2)
-            y = py + (ph // 2) - (self.size // 2)
-            self.window.geometry(f"{self.size}x{self.size}+{x}+{y}")
+            y = py + (ph // 2) - (self.window_height // 2)
+            self.window.geometry(f"{self.size}x{self.window_height}+{x}+{y}")
         except:
             pass
+    
+    def set_speed(self, speed_text):
+        """Update speed indicator text."""
+        self.speed_text = speed_text
+        if self.speed_label:
+            try:
+                self.speed_label.config(text=speed_text)
+            except:
+                pass
     
     def start(self):
         """Show transparent spinner overlay."""
@@ -497,10 +509,16 @@ class LoadingSpinner:
         except:
             pass
         
-        # Create canvas
+        # Create canvas for spinner
         self.canvas = tk.Canvas(self.window, width=self.size, height=self.size,
                                bg=self.chroma_key, highlightthickness=0)
         self.canvas.pack()
+        
+        # Speed label below spinner
+        self.speed_label = tk.Label(self.window, text=self.speed_text, 
+                                   bg=self.chroma_key, fg='white',
+                                   font=('Consolas', 9, 'bold'))
+        self.speed_label.pack()
         
         self._update_position()
         self._spin()
@@ -508,6 +526,7 @@ class LoadingSpinner:
     def stop(self):
         """Hide spinner."""
         self.is_spinning = False
+        self.speed_text = ""
         
         if self.timer_id:
             try:
@@ -523,6 +542,7 @@ class LoadingSpinner:
                 pass
             self.window = None
             self.canvas = None
+            self.speed_label = None
     
     def destroy(self):
         """Clean up."""

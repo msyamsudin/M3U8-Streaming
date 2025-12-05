@@ -151,6 +151,10 @@ class M3U8StreamingPlayer:
         self.root.bind("<F1>", lambda e: self.show_shortcuts_dialog())
         self.root.bind("<Configure>", self.on_window_resize)
         
+        # ALT key to toggle menu bar (use KeyRelease to avoid double trigger)
+        self.root.bind("<KeyRelease-Alt_L>", lambda e: self.toggle_menu_bar())
+        self.root.bind("<KeyRelease-Alt_R>", lambda e: self.toggle_menu_bar())
+        
         # Video Canvas Bindings
         self.video_canvas.bind("<Button-1>", self.start_drag)
         self.video_canvas.bind("<B1-Motion>", self.do_drag)
@@ -158,21 +162,24 @@ class M3U8StreamingPlayer:
         self.video_canvas.bind("<Double-Button-1>", lambda e: self.handle_double_click())
 
     def setup_menu(self):
-        # Custom Menu Bar Container
-        # Use content_frame instead of root
+        # Menu visibility state
+        self.menu_visible = False
+        self.last_menu_toggle = 0  # Debounce timestamp
+        
+        # Custom Menu Bar Container (hidden by default)
         self.menu_bar = tk.Frame(self.content_frame, bg=COLORS['menu_bg'])
-        self.menu_bar.pack(side=tk.TOP, fill=tk.X)
+        # Don't pack initially - hidden by default
         
         # Separator Line
         self.menu_separator = tk.Frame(self.content_frame, bg=COLORS['button_active'], height=1)
-        self.menu_separator.pack(side=tk.TOP, fill=tk.X)
+        # Don't pack initially - hidden by default
         
-        # Left: Menu Buttons
-        self.menu_left = tk.Frame(self.menu_bar, bg=COLORS['menu_bg'])
-        self.menu_left.pack(side=tk.LEFT)
+        # Right: All menus and buttons
+        self.menu_right = tk.Frame(self.menu_bar, bg=COLORS['menu_bg'])
+        self.menu_right.pack(side=tk.RIGHT, padx=5)
         
         # File Menu
-        self.file_btn = tk.Menubutton(self.menu_left, text="File", bg=COLORS['menu_bg'], fg=COLORS['text'],
+        self.file_btn = tk.Menubutton(self.menu_right, text="File", bg=COLORS['menu_bg'], fg=COLORS['text'],
                                      activebackground=COLORS['button_hover'], activeforeground=COLORS['text'],
                                      bd=0, relief=tk.FLAT, font=('Segoe UI', 9))
         self.file_btn.pack(side=tk.LEFT, padx=2)
@@ -184,7 +191,7 @@ class M3U8StreamingPlayer:
         self.file_btn.config(menu=file_menu)
         
         # View Menu
-        self.view_btn = tk.Menubutton(self.menu_left, text="View", bg=COLORS['menu_bg'], fg=COLORS['text'],
+        self.view_btn = tk.Menubutton(self.menu_right, text="View", bg=COLORS['menu_bg'], fg=COLORS['text'],
                                      activebackground=COLORS['button_hover'], activeforeground=COLORS['text'],
                                      bd=0, relief=tk.FLAT, font=('Segoe UI', 9))
         self.view_btn.pack(side=tk.LEFT, padx=2)
@@ -193,13 +200,10 @@ class M3U8StreamingPlayer:
         view_menu.add_command(label="Fullscreen (F)", command=self.toggle_fullscreen)
         self.always_on_top_var = tk.BooleanVar(value=False)
         view_menu.add_checkbutton(label="Always on Top", variable=self.always_on_top_var, command=self.toggle_always_on_top)
-        
-
-        
         self.view_btn.config(menu=view_menu)
 
         # Help Menu
-        self.help_btn = tk.Menubutton(self.menu_left, text="Help", bg=COLORS['menu_bg'], fg=COLORS['text'],
+        self.help_btn = tk.Menubutton(self.menu_right, text="Help", bg=COLORS['menu_bg'], fg=COLORS['text'],
                                      activebackground=COLORS['button_hover'], activeforeground=COLORS['text'],
                                      bd=0, relief=tk.FLAT, font=('Segoe UI', 9))
         self.help_btn.pack(side=tk.LEFT, padx=2)
@@ -210,29 +214,12 @@ class M3U8StreamingPlayer:
         help_menu.add_command(label="About", command=self.show_about_dialog)
         self.help_btn.config(menu=help_menu)
 
+        # History Button (styled like Menubutton)
+        self.history_btn = tk.Button(self.menu_right, text="History", bg=COLORS['menu_bg'], fg=COLORS['text'],
+                                    activebackground=COLORS['button_hover'], activeforeground=COLORS['text'],
+                                    bd=0, relief=tk.FLAT, font=('Segoe UI', 9), command=self.toggle_history)
+        self.history_btn.pack(side=tk.LEFT, padx=2)
 
-        
-        # Right: Status Indicators
-        self.menu_right = tk.Frame(self.menu_bar, bg=COLORS['menu_bg'])
-        self.menu_right.pack(side=tk.RIGHT, padx=10)
-        
-        # Speed Label (Now first/left)
-        self.speed_label = tk.Label(self.menu_right, text="", bg=COLORS['menu_bg'], 
-                                   fg=COLORS['speed_fg'], font=('Consolas', 9, 'bold'))
-        self.speed_label.pack(side=tk.LEFT, padx=(0, 5))
-
-        # Separator
-        tk.Label(self.menu_right, text="|", bg=COLORS['menu_bg'], fg=COLORS['text_gray'], font=('Segoe UI', 9)).pack(side=tk.LEFT, padx=5)
-
-        # Status Label (Now second/right)
-        self.status_label = tk.Label(self.menu_right, text="Ready", bg=COLORS['menu_bg'], fg=COLORS['status_ready_fg'], font=('Segoe UI', 9))
-        self.status_label.pack(side=tk.LEFT)
-
-        # Separator 2
-        tk.Label(self.menu_right, text="|", bg=COLORS['menu_bg'], fg=COLORS['text_gray'], font=('Segoe UI', 9)).pack(side=tk.LEFT, padx=5)
-
-        # History Button
-        StyledButton(self.menu_right, text="🕒", command=self.toggle_history, width=3, font=('Segoe UI', 9), bg_color=COLORS['menu_bg']).pack(side=tk.LEFT, padx=(0, 5))
 
     def setup_ui(self):
         # Main container (Horizontal for History Panel)
@@ -418,7 +405,7 @@ class M3U8StreamingPlayer:
             widget.bind("<Leave>", self.on_volume_leave)
         
         # Fullscreen
-        StyledButton(controls_right, text="⛶", command=self.toggle_fullscreen, width=4, font=('Segoe UI', 14)).pack(side=tk.LEFT, padx=(10, 0))
+        StyledButton(controls_right, text="⛶", command=self.toggle_fullscreen, width=4, font=('Segoe UI', 14)).pack(side=tk.LEFT, padx=(10, 0), pady=(0, 3))
         # We pack this last with fill=tk.X and expand=True
         seek_frame = tk.Frame(self.ctrl_frame, bg=COLORS['control_bg'])
         seek_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
@@ -473,6 +460,29 @@ class M3U8StreamingPlayer:
 
     def toggle_always_on_top(self):
         self.root.attributes('-topmost', self.always_on_top_var.get())
+    
+    def toggle_menu_bar(self):
+        """Toggle menu bar visibility with ALT key."""
+        import time
+        current_time = time.time()
+        
+        # Debounce - ignore if called within 200ms
+        if current_time - self.last_menu_toggle < 0.2:
+            return
+        self.last_menu_toggle = current_time
+        
+        if self.menu_visible:
+            self.menu_bar.pack_forget()
+            self.menu_separator.pack_forget()
+            self.menu_visible = False
+        else:
+            # Pack at top, before other content
+            self.menu_bar.pack(side=tk.TOP, fill=tk.X, before=self.main_container)
+            self.menu_separator.pack(side=tk.TOP, fill=tk.X, before=self.main_container)
+            self.menu_visible = True
+        
+        # Force UI update
+        self.root.update_idletasks()
 
     def load_from_history(self, url):
         self.url_entry.delete(0, tk.END)
@@ -506,7 +516,6 @@ class M3U8StreamingPlayer:
             return
         
         self.current_url = url
-        self.status_label.config(text="Loading...", fg=COLORS['status_loading_fg'])
         self.spinner.start()
         
         # Hide placeholder overlay
@@ -573,7 +582,6 @@ class M3U8StreamingPlayer:
 
     def _on_play_start(self):
         self.play_btn.config(text="⏸")
-        self.status_label.config(text="Playing", fg=COLORS['status_playing_fg'])
         self.video_canvas.focus_set()
         
         # Update Quality List
@@ -628,18 +636,15 @@ class M3U8StreamingPlayer:
 
         if self.player and self.player.pause():
             self.play_btn.config(text="▶")
-            self.status_label.config(text="Paused", fg=COLORS['status_paused_fg'])
             self.spinner.stop() # Ensure spinner is hidden when paused
         else:
             self.play_btn.config(text="⏸")
-            self.status_label.config(text="Playing", fg=COLORS['status_playing_fg'])
 
     def stop_stream(self):
         if self.player:
             self.player.stop()
             self.is_playing = False
             self.play_btn.config(text="▶")
-            self.status_label.config(text="Stopped", fg=COLORS['status_stopped_fg'])
             self.spinner.stop()
             
             # Save progress before stopping
@@ -722,21 +727,18 @@ class M3U8StreamingPlayer:
                     if int(cur) % 5 == 0:
                         update_history_progress(self.current_url, cur)
                 
-                # Update network speed indicator
+                # Update network speed indicator (on spinner during buffering)
                 cache_state = self.player.get_demuxer_cache_state()
                 if cache_state and isinstance(cache_state, dict):
                     raw_rate = cache_state.get('raw-input-rate', 0)
                     if raw_rate and raw_rate > 0:
                         speed_text = self.format_speed(raw_rate)
-                        self.speed_label.config(text=f" {speed_text}")
+                        self.spinner.set_speed(speed_text)
                     else:
-                        self.speed_label.config(text="")
+                        self.spinner.set_speed("")
                 else:
-                    self.speed_label.config(text="")
+                    self.spinner.set_speed("")
             except: pass
-        else:
-            # Hide speed indicator when not playing
-            self.speed_label.config(text="")
         self.root.after(1000, self.update_player_info)
 
     def on_volume_enter(self, event):
