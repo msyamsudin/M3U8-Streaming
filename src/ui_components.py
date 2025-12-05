@@ -1,4 +1,5 @@
 import tkinter as tk
+import os
 from .config import COLORS
 
 class StyledButton(tk.Button):
@@ -24,6 +25,99 @@ class StyledButton(tk.Button):
     def on_leave(self, e):
         if self['state'] != 'disabled':
             self['bg'] = self.default_bg
+
+class TitleBarButton(tk.Button):
+    def __init__(self, master, text="", command=None, bg_color=None, hover_color=None, **kwargs):
+        super().__init__(master, text=text, command=command, **kwargs)
+        self.default_bg = bg_color if bg_color else COLORS['bg']
+        self.hover_bg = hover_color if hover_color else COLORS['button_hover']
+        self.config(
+            bg=self.default_bg,
+            fg=COLORS['text'],
+            activebackground=self.hover_bg,
+            activeforeground=COLORS['text'],
+            relief=tk.FLAT,
+            bd=0,
+            cursor='hand2',
+            font=('Segoe UI', 10),
+            width=5
+        )
+        self.bind('<Enter>', self.on_enter)
+        self.bind('<Leave>', self.on_leave)
+
+    def on_enter(self, e):
+        self['bg'] = self.hover_bg
+
+    def on_leave(self, e):
+        self['bg'] = self.default_bg
+
+class CustomTitleBar(tk.Frame):
+    def __init__(self, master, title="M3U8 Player", **kwargs):
+        super().__init__(master, bg=COLORS['bg'], height=30, **kwargs)
+        self.pack_propagate(False)
+        self.master = master
+        self._drag_start_x = 0
+        self._drag_start_y = 0
+
+        # Title Icon (optional, just a symbol)
+        self.icon_label = tk.Label(self, text="▶", bg=COLORS['bg'], fg=COLORS['accent'], font=('Segoe UI', 10, 'bold'))
+        self.icon_label.pack(side=tk.LEFT, padx=(10, 5))
+
+        # Title Text
+        self.title_label = tk.Label(self, text=title, bg=COLORS['bg'], fg=COLORS['text'], font=('Segoe UI', 9))
+        self.title_label.pack(side=tk.LEFT, padx=5)
+
+        # Window Controls
+        self.close_btn = TitleBarButton(self, text="✕", command=self.close_window, hover_color="#ff4444")
+        self.close_btn.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        self.max_btn = TitleBarButton(self, text="▢", command=self.maximize_restore_window)
+        self.max_btn.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        self.min_btn = TitleBarButton(self, text="—", command=self.minimize_window)
+        self.min_btn.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Bindings for Dragging
+        self.bind('<Button-1>', self.start_drag)
+        self.bind('<B1-Motion>', self.do_drag)
+        self.bind('<Double-Button-1>', self.maximize_restore_window)
+        
+        # Bind children to propagate drag (except buttons)
+        for widget in [self.icon_label, self.title_label]:
+            widget.bind('<Button-1>', self.start_drag)
+            widget.bind('<B1-Motion>', self.do_drag)
+            widget.bind('<Double-Button-1>', self.maximize_restore_window)
+
+    def start_drag(self, event):
+        self._drag_start_x = event.x
+        self._drag_start_y = event.y
+
+    def do_drag(self, event):
+        if self.master.state() == 'zoomed':
+            return
+            
+        # Add a small threshold to discern click from drag
+        if abs(event.x - self._drag_start_x) > 5 or abs(event.y - self._drag_start_y) > 5:
+            from ctypes import windll
+            self.master.update_idletasks()
+            hwnd = windll.user32.GetParent(self.master.winfo_id())
+            windll.user32.ReleaseCapture()
+            windll.user32.PostMessageW(hwnd, 0xA1, 2, 0)
+
+    def maximize_restore_window(self, event=None):
+        if self.master.state() == 'zoomed':
+            self.master.state('normal')
+            self.max_btn.config(text="▢")
+        else:
+            self.master.state('zoomed')
+            self.max_btn.config(text="❐")
+
+    def minimize_window(self):
+        self.master.state('iconic')
+
+    def close_window(self):
+        self.master.event_generate("<<CloseRequest>>") # Decouple
+
 
 class RoundedButton(tk.Canvas):
     def __init__(self, master, text="", command=None, width=120, height=35, corner_radius=10, 
@@ -573,3 +667,129 @@ class BufferedScale(tk.Canvas):
             self.draw()
             # Optional: Call command while dragging for live seek
             # if self.command: self.command(self.progress)
+
+def apply_custom_window_style(window, enable_resize=False):
+    """
+    Remove Windows title bar.
+    - If enable_resize=False (Dialogs): Use overrideredirect(True) for guaranteed removal.
+    - If enable_resize=True (Main Window): Use ctypes to remove WS_CAPTION but keep resizing.
+    """
+    if not enable_resize:
+        window.overrideredirect(True)
+    
+    if os.name == 'nt' and enable_resize:
+        try:
+            from ctypes import windll
+            window.update_idletasks()
+            hwnd = windll.user32.GetParent(window.winfo_id())
+            # WS_CAPTION = 0x00C00000 -> Remove
+            # WS_THICKFRAME = 0x00040000 -> Keep
+            # WS_SYSMENU = 0x00080000 -> Keep for taskbar interaction
+            style = windll.user32.GetWindowLongW(hwnd, -16) 
+            style = (style & ~0x00C00000) | 0x00040000
+            windll.user32.SetWindowLongW(hwnd, -16, style)
+            windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 0x27)
+        except: pass
+
+class CustomMessagebox(tk.Toplevel):
+    def __init__(self, master, title, message, buttons, icon="info"):
+        super().__init__(master, bg=COLORS['border']) # Border color backbone
+        self.result = None
+        
+        # Apply style
+        apply_custom_window_style(self)
+        
+        # Title Bar
+        self.title_bar = CustomTitleBar(self, title=title)
+        self.title_bar.min_btn.pack_forget()
+        self.title_bar.max_btn.pack_forget()
+        self.title_bar.pack(side=tk.TOP, fill=tk.X, padx=1, pady=0)
+        self.bind("<<CloseRequest>>", self.on_cancel)
+        
+        # Content
+        content = tk.Frame(self, bg=COLORS['bg'])
+        content.pack(fill=tk.BOTH, expand=True, padx=1, pady=(0, 1))
+        
+        # Message Area (Row: Icon + Text)
+        msg_frame = tk.Frame(content, bg=COLORS['bg'])
+        msg_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=25)
+        
+        # Icon
+        icon_char = "ℹ"
+        icon_color = COLORS['text']
+        if icon == "warning": 
+            icon_char = "⚠"
+            icon_color = COLORS['status_paused_fg'] # Orange
+        elif icon == "error": 
+            icon_char = "❌"
+            icon_color = COLORS['status_stopped_fg'] # Red
+        elif icon == "question":
+            icon_char = "?"
+            icon_color = COLORS['accent']
+            
+        tk.Label(msg_frame, text=icon_char, bg=COLORS['bg'], fg=icon_color, 
+                 font=('Segoe UI', 32)).pack(side=tk.LEFT, padx=(0, 20), anchor="n")
+                 
+        tk.Label(msg_frame, text=message, bg=COLORS['bg'], fg=COLORS['text'],
+                 font=('Segoe UI', 10), justify=tk.LEFT, wraplength=350).pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Buttons
+        btn_frame = tk.Frame(content, bg=COLORS['bg'])
+        btn_frame.pack(fill=tk.X, padx=20, pady=(0, 20))
+        
+        for btn_text in reversed(buttons): # Right align, so pack reversed
+            cmd = lambda t=btn_text: self.on_click(t)
+            
+            # Button Styling
+            if btn_text in ["OK", "Yes"]:
+                # Primary Style
+                btn = RoundedButton(btn_frame, text=btn_text, command=cmd, width=80, height=30,
+                                  bg=COLORS['load_btn_bg'], hover_bg=COLORS['load_btn_hover'], 
+                                  active_bg=COLORS['load_btn_active'], fg=COLORS['load_btn_fg'])
+            else:
+                # Secondary Style
+                btn = RoundedButton(btn_frame, text=btn_text, command=cmd, width=80, height=30,
+                                  bg=COLORS['button_bg'], hover_bg=COLORS['button_hover'],
+                                  active_bg=COLORS['button_active'], fg=COLORS['text'])
+            
+            btn.pack(side=tk.RIGHT, padx=5)
+
+        # Modal Setup
+        self.lift()
+        self.grab_set()
+        
+        # Center
+        self.update_idletasks()
+        w = max(400, self.winfo_width())
+        h = max(180, self.winfo_height())
+        x = (self.winfo_screenwidth() // 2) - (w // 2)
+        y = (self.winfo_screenheight() // 2) - (h // 2)
+        self.geometry(f"{w}x{h}+{x}+{y}")
+        
+    def on_click(self, value):
+        self.result = value
+        self.destroy()
+        
+    def on_cancel(self, event=None):
+        self.result = None 
+        self.destroy()
+
+def show_custom_error(master, title, message):
+    d = CustomMessagebox(master, title, message, buttons=["OK"], icon="error")
+    master.wait_window(d)
+    return d.result
+
+def show_custom_warning(master, title, message):
+    d = CustomMessagebox(master, title, message, buttons=["OK"], icon="warning")
+    master.wait_window(d)
+    return d.result
+
+def show_custom_info(master, title, message):
+    d = CustomMessagebox(master, title, message, buttons=["OK"], icon="info")
+    master.wait_window(d)
+    return d.result
+
+def ask_custom_yes_no(master, title, message):
+    d = CustomMessagebox(master, title, message, buttons=["Yes", "No"], icon="question")
+    master.wait_window(d)
+    return d.result == "Yes"

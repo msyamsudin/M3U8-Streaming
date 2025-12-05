@@ -7,15 +7,25 @@ from datetime import datetime
 
 from .config import COLORS, USER_AGENTS
 from .player_core import MpvPlayer
-from .ui_components import StyledButton, PrimaryButton, HistoryPanel, LoadingSpinner, BufferedScale
+from .ui_components import StyledButton, PrimaryButton, HistoryPanel, LoadingSpinner, BufferedScale, CustomTitleBar, apply_custom_window_style, show_custom_error, show_custom_warning, show_custom_info, ask_custom_yes_no
 from .utils import format_time, load_history, save_history, get_unique_filename, write_history, update_history_progress, get_history_item, load_settings, save_settings
 
 class M3U8StreamingPlayer:
     def __init__(self, root):
         self.root = root
         self.root.title("M3U8 Player")
-        self.root.geometry("1000x600")
-        self.root.configure(bg=COLORS['bg'])
+        # Center the window
+        w, h = 1000, 600
+        ws = self.root.winfo_screenwidth()
+        hs = self.root.winfo_screenheight()
+        x = (ws // 2) - (w // 2)
+        y = (hs // 2) - (h // 2)
+        self.root.geometry(f"{w}x{h}+{x}+{y}")
+        self.root.configure(bg=COLORS['border']) # Use border color for root backbone
+        
+        # --- Custom Title Bar Setup (Windows) ---
+        self.setup_custom_window()
+        # ----------------------------------------
         
         # State
         self.player = None
@@ -43,11 +53,14 @@ class M3U8StreamingPlayer:
 
         # Settings
         self.settings = load_settings()
-        self.control_layout = self.settings.get('control_layout', 'right') # Default to right
+
 
         # Initialize UI
+        # Initialize UI
         self.setup_styles()
-        self.setup_menu()
+        self.setup_title_bar()  # Initialize Custom Title Bar
+        self.setup_menu()       # Note: We might need to adjust menu to not double-up or look weird?
+                                # Standard menu bar usually sits below title bar.
         self.setup_ui()
         self.setup_bindings()
         
@@ -55,7 +68,7 @@ class M3U8StreamingPlayer:
         try:
             self.player = MpvPlayer(wid=self.video_canvas.winfo_id())
         except Exception as e:
-            messagebox.showerror("Error", str(e))
+            show_custom_error(self.root, "Error", str(e))
 
         # Bind MPV Mouse Events
         if self.player and self.player.mpv:
@@ -75,6 +88,19 @@ class M3U8StreamingPlayer:
         
         # Remove focus from buttons on startup
         self.root.focus_set()
+
+    def setup_custom_window(self):
+        """Remove Windows title bar but keep resizing and taskbar presence using ctypes."""
+        apply_custom_window_style(self.root, enable_resize=True)
+
+    def setup_title_bar(self):
+        self.title_bar = CustomTitleBar(self.root, title="M3U8 Player")
+        self.title_bar.pack(side=tk.TOP, fill=tk.X, padx=1, pady=0)
+        self.root.bind("<<CloseRequest>>", lambda e: self.on_closing())
+        
+        # Main content container (with border padding effect from root)
+        self.content_frame = tk.Frame(self.root, bg=COLORS['bg'])
+        self.content_frame.pack(fill=tk.BOTH, expand=True, padx=1, pady=(0, 1))
 
     def setup_styles(self):
         style = ttk.Style()
@@ -133,11 +159,12 @@ class M3U8StreamingPlayer:
 
     def setup_menu(self):
         # Custom Menu Bar Container
-        self.menu_bar = tk.Frame(self.root, bg=COLORS['menu_bg'])
+        # Use content_frame instead of root
+        self.menu_bar = tk.Frame(self.content_frame, bg=COLORS['menu_bg'])
         self.menu_bar.pack(side=tk.TOP, fill=tk.X)
         
         # Separator Line
-        self.menu_separator = tk.Frame(self.root, bg=COLORS['button_active'], height=1)
+        self.menu_separator = tk.Frame(self.content_frame, bg=COLORS['button_active'], height=1)
         self.menu_separator.pack(side=tk.TOP, fill=tk.X)
         
         # Left: Menu Buttons
@@ -167,15 +194,7 @@ class M3U8StreamingPlayer:
         self.always_on_top_var = tk.BooleanVar(value=False)
         view_menu.add_checkbutton(label="Always on Top", variable=self.always_on_top_var, command=self.toggle_always_on_top)
         
-        view_menu.add_separator()
-        
-        # Control Layout Submenu
-        layout_menu = Menu(view_menu, tearoff=0, bg=COLORS['menu_bg'], fg=COLORS['text'])
-        self.layout_var = tk.StringVar(value=self.control_layout)
-        layout_menu.add_radiobutton(label="Split (Left/Right)", variable=self.layout_var, value="split", command=lambda: self.apply_control_layout("split"))
-        layout_menu.add_radiobutton(label="All Right (Default)", variable=self.layout_var, value="right", command=lambda: self.apply_control_layout("right"))
-        layout_menu.add_radiobutton(label="All Left", variable=self.layout_var, value="left", command=lambda: self.apply_control_layout("left"))
-        view_menu.add_cascade(label="Control Layout", menu=layout_menu)
+
         
         self.view_btn.config(menu=view_menu)
 
@@ -217,7 +236,7 @@ class M3U8StreamingPlayer:
 
     def setup_ui(self):
         # Main container (Horizontal for History Panel)
-        self.main_container = tk.Frame(self.root, bg=COLORS['bg'])
+        self.main_container = tk.Frame(self.content_frame, bg=COLORS['bg'])
         self.main_container.pack(fill=tk.BOTH, expand=True)
 
         # Left side (Player)
@@ -324,7 +343,7 @@ class M3U8StreamingPlayer:
         if self.current_url:
             self.root.clipboard_clear()
             self.root.clipboard_append(self.current_url)
-            messagebox.showinfo("Copied", "Stream URL copied to clipboard")
+            show_custom_info(self.root, "Copied", "Stream URL copied to clipboard")
     
     def _on_url_focus_in(self, event):
         if self.url_entry.get() == "Enter M3U8 stream URL...":
@@ -434,38 +453,6 @@ class M3U8StreamingPlayer:
         # Actually, let's put Quality in the menu bar or keep it hidden until needed.
         # History is toggleable via 'H'.
         
-        # Ensure layout settings don't break things (we removed apply_control_layout usage)
-        self.control_layout = "custom"
-
-    def apply_control_layout(self, layout_type):
-        self.control_layout = layout_type
-        self.layout_var.set(layout_type)
-        
-        # Save setting
-        self.settings['control_layout'] = layout_type
-        save_settings(self.settings)
-        
-        # Reset packing
-        self.ctrl_left.pack_forget()
-        self.ctrl_right.pack_forget()
-        
-        if layout_type == "split":
-            # Left controls on Left, Right controls on Right
-            self.ctrl_left.pack(side=tk.LEFT)
-            self.ctrl_right.pack(side=tk.RIGHT)
-            
-        elif layout_type == "left":
-            # All controls on Left
-            # Pack Left first (to be leftmost), then Right (to be next to it)
-            self.ctrl_left.pack(side=tk.LEFT)
-            self.ctrl_right.pack(side=tk.LEFT)
-            
-        else: # "right" (Default)
-            # All controls on Right
-            # Pack Right first (to be rightmost), then Left (to be next to it)
-            self.ctrl_right.pack(side=tk.RIGHT)
-            self.ctrl_left.pack(side=tk.RIGHT)
-
     def show_open_dialog(self):
         if self.show_config:
             self.config_panel.pack_forget()
@@ -504,7 +491,7 @@ class M3U8StreamingPlayer:
             self.refresh_history()
 
     def clear_history(self):
-        if messagebox.askyesno("Confirm", "Are you sure you want to clear all history?"):
+        if ask_custom_yes_no(self.root, "Confirm", "Are you sure you want to clear all history?"):
             write_history([])
             self.refresh_history()
 
@@ -515,7 +502,7 @@ class M3U8StreamingPlayer:
 
         # Check if URL is placeholder or empty
         if not url or url == "Enter M3U8 stream URL...":
-            messagebox.showwarning("Warning", "Please enter a valid URL")
+            show_custom_warning(self.root, "Warning", "Please enter a valid URL")
             return
         
         self.current_url = url
@@ -544,7 +531,7 @@ class M3U8StreamingPlayer:
             headers = {"Referer": ref, "User-Agent": ua}
             r = requests.head(url, headers=headers, timeout=10, allow_redirects=True)
             if r.status_code >= 400:
-                self.root.after(0, lambda: messagebox.showerror("Error", f"HTTP {r.status_code}"))
+                self.root.after(0, lambda: show_custom_error(self.root, "Error", f"HTTP {r.status_code}"))
                 return
 
             if self.player:
@@ -582,7 +569,7 @@ class M3U8StreamingPlayer:
                         self.root.after(0, self.stop_stream)
                 
         except Exception as e:
-            self.root.after(0, lambda: messagebox.showerror("Error", str(e)))
+            self.root.after(0, lambda: show_custom_error(self.root, "Error", str(e)))
 
     def _on_play_start(self):
         self.play_btn.config(text="⏸")
@@ -600,7 +587,7 @@ class M3U8StreamingPlayer:
         if item and item.get('last_position', 0) > 5:
             pos = item['last_position']
             formatted = format_time(pos)
-            if messagebox.askyesno("Resume Playback", f"Resume from {formatted}?"):
+            if ask_custom_yes_no(self.root, "Resume Playback", f"Resume from {formatted}?"):
                 self._retry_seek(pos)
 
     def _retry_seek(self, pos, attempt=1):
@@ -612,7 +599,7 @@ class M3U8StreamingPlayer:
                 print(f"Seek failed (attempt {attempt}): {e}. Retrying in 1s...")
                 self.root.after(1000, lambda: self._retry_seek(pos, attempt + 1))
             else:
-                messagebox.showerror("Error", f"Failed to resume playback after multiple attempts.\n{e}")
+                show_custom_error(self.root, "Error", f"Failed to resume playback after multiple attempts.\n{e}")
 
     def update_quality_list(self):
         if not self.player: return
@@ -636,7 +623,7 @@ class M3U8StreamingPlayer:
 
     def toggle_play_pause(self):
         if not self.current_url:
-            messagebox.showwarning("Warning", "Please load a URL first")
+            show_custom_warning(self.root, "Warning", "Please load a URL first")
             return
 
         if self.player and self.player.pause():
@@ -859,12 +846,12 @@ class M3U8StreamingPlayer:
             self.is_dragging = True
             self.possible_click = False # It's definitely a drag now
             
-            # Get current window position
-            x = self.root.winfo_x() + delta_x
-            y = self.root.winfo_y() + delta_y
-            
-            # Move window
-            self.root.geometry(f"+{x}+{y}")
+            # Switch to system dragging for smooth performance (prevents ghosting)
+            from ctypes import windll
+            self.root.update_idletasks()
+            hwnd = windll.user32.GetParent(self.root.winfo_id())
+            windll.user32.ReleaseCapture()
+            windll.user32.PostMessageW(hwnd, 0xA1, 2, 0)
     
     def stop_drag(self, event):
         """Stop window drag when user releases mouse button."""
@@ -904,6 +891,14 @@ class M3U8StreamingPlayer:
         # Hide menu bar
         self.menu_bar.pack_forget()
         self.menu_separator.pack_forget()
+
+        # Hide Custom Title Bar
+        if hasattr(self, 'title_bar'):
+            self.title_bar.pack_forget()
+            
+        # Remove Content Frame Padding (for true fullscreen)
+        if hasattr(self, 'content_frame'):
+            self.content_frame.pack_configure(padx=0, pady=0)
         
         # Remove borders for clean look
         self.video_frame.config(bd=0, relief=tk.FLAT)
@@ -945,12 +940,24 @@ class M3U8StreamingPlayer:
         self.menu_bar.pack(side=tk.TOP, fill=tk.X, before=self.main_container)
         self.menu_separator.pack(side=tk.TOP, fill=tk.X, before=self.main_container)
         
+        # Restore Custom Title Bar (Packed First)
+        if hasattr(self, 'title_bar'):
+             self.title_bar.pack(side=tk.TOP, fill=tk.X, before=self.content_frame, padx=1, pady=(1, 0))
+             
+        # Restore Content Frame Padding
+        if hasattr(self, 'content_frame'):
+            self.content_frame.pack_configure(padx=1, pady=(0, 1))
+
         # Restore panels if they were enabled
         if self.show_config:
             self.config_panel.pack(fill=tk.X, side=tk.TOP, before=self.video_frame, padx=4, pady=4)
             
         if self.show_history:
             self.history_panel.pack(side=tk.BOTTOM, fill=tk.X)
+            
+        # Re-apply custom window styles (remove default title bar again)
+        # Tkinter often resets this when toggling fullscreen/state
+        self.root.after(100, self.setup_custom_window)
 
     def on_fullscreen_motion(self, event):
         if not self.is_fullscreen: return
@@ -997,13 +1004,26 @@ class M3U8StreamingPlayer:
     def show_shortcuts_dialog(self):
         """Display keyboard shortcuts dialog"""
         dialog = tk.Toplevel(self.root)
-        dialog.title("Keyboard Shortcuts")
-        dialog.geometry("500x600")
-        dialog.configure(bg=COLORS['bg'])
-        dialog.resizable(False, False)
+        
+        # Apply custom style
+        # Apply custom style
+        apply_custom_window_style(dialog, enable_resize=False)
+            
+        dialog.configure(bg=COLORS['border']) # Border color
+        
+        # Custom Title Bar for Dialog
+        title_bar = CustomTitleBar(dialog, title="Keyboard Shortcuts")
+        title_bar.min_btn.pack_forget() # No minimize for modal
+        title_bar.max_btn.pack_forget() # No maximize for modal
+        title_bar.pack(side=tk.TOP, fill=tk.X, padx=1, pady=0)
+        dialog.bind("<<CloseRequest>>", lambda e: dialog.destroy()) # Bind close
+        
+        # Content Frame
+        content_frame = tk.Frame(dialog, bg=COLORS['bg'])
+        content_frame.pack(fill=tk.BOTH, expand=True, padx=1, pady=(0, 1))
         
         # Make it modal
-        dialog.transient(self.root)
+        dialog.lift()   # Replaces transient to avoid freeze with overrideredirect
         dialog.grab_set()
         
         # Center the dialog
@@ -1013,13 +1033,13 @@ class M3U8StreamingPlayer:
         dialog.geometry(f"+{x}+{y}")
         
         # Header
-        header = tk.Frame(dialog, bg=COLORS['header_bg'])
+        header = tk.Frame(content_frame, bg=COLORS['header_bg']) # Changed dialog -> content_frame
         header.pack(fill=tk.X, pady=(0, 10))
         tk.Label(header, text="⌨️ Keyboard Shortcuts", bg=COLORS['header_bg'], fg=COLORS['text'],
                 font=('Segoe UI', 12, 'bold')).pack(pady=15, padx=20, anchor=tk.W)
         
         # Shortcuts list
-        shortcuts_frame = tk.Frame(dialog, bg=COLORS['bg'])
+        shortcuts_frame = tk.Frame(content_frame, bg=COLORS['bg']) # Changed dialog -> content_frame
         shortcuts_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
         
         shortcuts = [
@@ -1060,13 +1080,7 @@ class M3U8StreamingPlayer:
                 tk.Label(row, text=action, bg=COLORS['bg'], fg=COLORS['text_gray'],
                         font=('Segoe UI', 9), anchor=tk.W).pack(side=tk.LEFT, fill=tk.X, expand=True)
         
-        # Close button
-        btn_frame = tk.Frame(dialog, bg=COLORS['bg'])
-        btn_frame.pack(fill=tk.X, padx=20, pady=(0, 20))
-        
-        from .ui_components import PrimaryButton
-        close_btn = PrimaryButton(btn_frame, text="Close", command=dialog.destroy)
-        close_btn.pack(side=tk.RIGHT)
+
         
         # Bind Escape to close
         dialog.bind("<Escape>", lambda e: dialog.destroy())
@@ -1074,13 +1088,33 @@ class M3U8StreamingPlayer:
     def show_about_dialog(self):
         """Display about dialog"""
         dialog = tk.Toplevel(self.root)
-        dialog.title("About")
-        dialog.geometry("400x300")
-        dialog.configure(bg=COLORS['bg'])
+        
+        # Apply custom style
+        # Apply custom style
+        apply_custom_window_style(dialog, enable_resize=False)
+            
+        dialog.configure(bg=COLORS['border'])
+        
+        # Custom Title Bar for Dialog
+        title_bar = CustomTitleBar(dialog, title="About")
+        title_bar.min_btn.pack_forget()
+        title_bar.max_btn.pack_forget()
+        title_bar.pack(side=tk.TOP, fill=tk.X, padx=1, pady=0)
+        dialog.bind("<<CloseRequest>>", lambda e: dialog.destroy())
+        
+        # Content Frame
+        # Re-using 'dialog' variable context but we need to ensure content is packed into this frame
+        # However, the original code used 'dialog' directly.
+        # We need to wrap original content into a frame or change original pack calls.
+        
+        content_frame = tk.Frame(dialog, bg=COLORS['bg'])
+        content_frame.pack(fill=tk.BOTH, expand=True, padx=1, pady=(0, 1))
+
+        dialog.geometry("500x360")
         dialog.resizable(False, False)
         
         # Make it modal
-        dialog.transient(self.root)
+        dialog.lift()   # Replaces transient to avoid freeze with overrideredirect
         dialog.grab_set()
         
         # Center the dialog
@@ -1090,7 +1124,7 @@ class M3U8StreamingPlayer:
         dialog.geometry(f"+{x}+{y}")
         
         # Content
-        content = tk.Frame(dialog, bg=COLORS['bg'])
+        content = tk.Frame(content_frame, bg=COLORS['bg']) # Changed dialog -> content_frame
         content.pack(fill=tk.BOTH, expand=True, padx=30, pady=30)
         
         # App Icon/Title
@@ -1107,10 +1141,7 @@ class M3U8StreamingPlayer:
                 bg=COLORS['bg'], fg=COLORS['text_gray'],
                 font=('Segoe UI', 9), justify=tk.CENTER).pack(pady=(0, 20))
         
-        # Close button
-        from .ui_components import PrimaryButton
-        close_btn = PrimaryButton(content, text="Close", command=dialog.destroy)
-        close_btn.pack()
+
         
         # Bind Escape to close
         dialog.bind("<Escape>", lambda e: dialog.destroy())
