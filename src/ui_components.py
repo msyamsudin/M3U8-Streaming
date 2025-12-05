@@ -416,171 +416,117 @@ class HistoryPanel(tk.Frame):
             self.list_container.bind_mouse_scroll(row.lbl_time)
 
 class LoadingSpinner:
+    """
+    Transparent rotating arc spinner using Toplevel overlay.
+    Arc floats directly over video with no visible background.
+    """
     def __init__(self, parent, size=60, color="white", bg_color="black", root_window=None):
         self.parent = parent
-        self.root_window = root_window  # Main window for state tracking
         self.size = size
-        self.color = "white" # Force white as per reference
-        self.bg_color = bg_color
-        self.window = None
-        self.dimmer = None
-        self.canvas = None
         self.angle = 0
         self.is_spinning = False
         self.timer_id = None
-        self.chroma_key = "#add123"
-        self.windows_hidden = False  # Track if windows are hidden due to minimize
-        self.state_check_id = None  # Timer for state polling
-
-    def draw(self):
-        if not self.canvas: return
+        self.window = None
+        self.canvas = None
+        self.chroma_key = "#010101"  # Color to make transparent
         
+    def _draw(self):
+        """Draw the thin rotating arc."""
+        if not self.canvas:
+            return
+            
         self.canvas.delete("all")
         w = self.size
         h = self.size
+        padding = 6
         
-        start = self.angle
-        extent = 90 # Shorter arc for a cleaner look
+        # Draw shadow arc (for visibility on light video)
+        self.canvas.create_arc(
+            padding + 2, padding + 2, w - padding + 2, h - padding + 2,
+            start=self.angle, extent=90,
+            outline='#222222', width=4, style="arc"
+        )
         
-        # Draw single thin white arc
-        self.canvas.create_arc(4, 4, w-4, h-4, start=start, extent=extent, 
-                              outline=self.color, width=3, style="arc")
-
-    def spin(self):
-        if self.is_spinning and self.canvas:
-            self.angle = (self.angle - 15) % 360 # Counter-clockwise or Clockwise? Let's go Clockwise (negative)
-            self.draw()
-            self.timer_id = self.parent.after(30, self.spin) # Faster smooth animation
-
-    def set_click_through(self, window):
-        if os.name == 'nt':
-            try:
-                from ctypes import windll
-                hwnd = windll.user32.GetParent(window.winfo_id())
-                GWL_EXSTYLE = -20
-                WS_EX_LAYERED = 0x00080000
-                WS_EX_TRANSPARENT = 0x00000020
-                style = windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-                windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED | WS_EX_TRANSPARENT)
-            except: pass
-
-    def start(self):
-        if not self.is_spinning:
-            self.is_spinning = True
-            
-            # 1. Create Dimmer (Dark Overlay)
-            self.dimmer = tk.Toplevel(self.parent)
-            self.dimmer.overrideredirect(True)
-            self.dimmer.config(bg='black')
-            self.dimmer.attributes('-alpha', 0.5) # 50% opacity
-            self.set_click_through(self.dimmer)
-            
-            # 2. Create Spinner Window (Transparent)
-            self.window = tk.Toplevel(self.parent)
-            self.window.overrideredirect(True)
-            # Don't use topmost - let it follow parent window's z-order
-            
-            # Set transparency for spinner
-            try:
-                self.window.config(bg=self.chroma_key)
-                self.window.wm_attributes('-transparentcolor', self.chroma_key)
-            except:
-                self.window.config(bg=self.bg_color)
-            
-            self.set_click_through(self.window)
-            
-            # Calculate position
-            self.update_position()
-            
-            # Bind to parent configure
-            self.parent.bind('<Configure>', self.update_position, add="+")
-            
-            self.canvas = tk.Canvas(self.window, width=self.size, height=self.size, 
-                                   bg=self.chroma_key, highlightthickness=0)
-            self.canvas.pack(fill=tk.BOTH, expand=True)
-            
-            # Start window state polling
-            if self.root_window:
-                self.check_window_state()
-            
-            self.spin()
-
-    def update_position(self, event=None):
-        if self.parent.winfo_exists():
-            try:
-                # Parent geometry
-                px = self.parent.winfo_rootx()
-                py = self.parent.winfo_rooty()
-                pw = self.parent.winfo_width()
-                ph = self.parent.winfo_height()
-                
-                # Update Dimmer
-                if self.dimmer:
-                    self.dimmer.geometry(f"{pw}x{ph}+{px}+{py}")
-                    self.dimmer.lift()
-                
-                # Update Spinner
-                if self.window:
-                    x = px + (pw // 2) - (self.size // 2)
-                    y = py + (ph // 2) - (self.size // 2)
-                    self.window.geometry(f"+{x}+{y}")
-                    self.window.lift()
-            except: pass
-
-    def stop(self):
-        self.is_spinning = False
-        if self.timer_id:
-            self.parent.after_cancel(self.timer_id)
-            self.timer_id = None
-        
-        # Stop state polling
-        if self.state_check_id:
-            self.parent.after_cancel(self.state_check_id)
-            self.state_check_id = None
-        
-        if self.window:
-            self.window.destroy()
-            self.window = None
-            self.canvas = None
-            
-        if self.dimmer:
-            self.dimmer.destroy()
-            self.dimmer = None
-
-    def check_window_state(self):
-        """Periodically check if window is minimized or unfocused and hide/show spinner accordingly"""
-        if not self.is_spinning or not self.root_window:
+        # Draw main white arc
+        self.canvas.create_arc(
+            padding, padding, w - padding, h - padding,
+            start=self.angle, extent=90,
+            outline='white', width=3, style="arc"
+        )
+    
+    def _spin(self):
+        """Animation loop."""
+        if self.is_spinning and self.window:
+            self.angle = (self.angle - 10) % 360
+            self._draw()
+            self._update_position()
+            self.timer_id = self.parent.after(20, self._spin)
+    
+    def _update_position(self):
+        """Keep spinner centered on parent."""
+        if not self.window or not self.parent.winfo_exists():
             return
-        
         try:
-            # Check if window is minimized (iconic state)
-            is_minimized = self.root_window.state() == 'iconic'
+            px = self.parent.winfo_rootx()
+            py = self.parent.winfo_rooty()
+            pw = self.parent.winfo_width()
+            ph = self.parent.winfo_height()
+            x = px + (pw // 2) - (self.size // 2)
+            y = py + (ph // 2) - (self.size // 2)
+            self.window.geometry(f"{self.size}x{self.size}+{x}+{y}")
+        except:
+            pass
+    
+    def start(self):
+        """Show transparent spinner overlay."""
+        if self.is_spinning:
+            return
             
-            # Check if window has focus (is active)
-            has_focus = self.root_window.focus_displayof() is not None
-            
-            # Hide spinner if minimized OR window doesn't have focus
-            should_hide = is_minimized or not has_focus
-            
-            if should_hide and not self.windows_hidden:
-                # Window minimized or lost focus - hide spinner
-                if self.window and self.dimmer:
-                    self.window.withdraw()
-                    self.dimmer.withdraw()
-                    self.windows_hidden = True
-            elif not should_hide and self.windows_hidden:
-                # Window restored and has focus - show spinner
-                if self.window and self.dimmer:
-                    self.dimmer.deiconify()
-                    self.window.deiconify()
-                    self.update_position()
-                    self.windows_hidden = False
+        self.is_spinning = True
+        self.angle = 0
+        
+        # Create transparent overlay window
+        self.window = tk.Toplevel(self.parent)
+        self.window.overrideredirect(True)
+        self.window.attributes('-topmost', True)
+        self.window.config(bg=self.chroma_key)
+        
+        # Make chroma key color transparent (Windows)
+        try:
+            self.window.wm_attributes('-transparentcolor', self.chroma_key)
         except:
             pass
         
-        # Continue polling every 200ms
-        if self.is_spinning:
-            self.state_check_id = self.parent.after(200, self.check_window_state)
+        # Create canvas
+        self.canvas = tk.Canvas(self.window, width=self.size, height=self.size,
+                               bg=self.chroma_key, highlightthickness=0)
+        self.canvas.pack()
+        
+        self._update_position()
+        self._spin()
+    
+    def stop(self):
+        """Hide spinner."""
+        self.is_spinning = False
+        
+        if self.timer_id:
+            try:
+                self.parent.after_cancel(self.timer_id)
+            except:
+                pass
+            self.timer_id = None
+        
+        if self.window:
+            try:
+                self.window.destroy()
+            except:
+                pass
+            self.window = None
+            self.canvas = None
+    
+    def destroy(self):
+        """Clean up."""
+        self.stop()
 
 class BufferedScale(tk.Canvas):
     def __init__(self, master, command=None, **kwargs):
