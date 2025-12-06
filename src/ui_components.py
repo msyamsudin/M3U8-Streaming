@@ -431,6 +431,7 @@ class LoadingSpinner:
         self.speed_label = None
         self.speed_text = ""
         self.chroma_key = "#010101"
+        self.window_width = 120  # Wide enough for speed text like "999.9 KB/s"
         self.window_height = size + 25  # Extra space for speed label
         
     def _draw(self):
@@ -447,23 +448,23 @@ class LoadingSpinner:
         self.canvas.create_arc(
             padding + 2, padding + 2, w - padding + 2, h - padding + 2,
             start=self.angle, extent=90,
-            outline='#222222', width=4, style="arc"
+            outline='#222222', width=6, style="arc"
         )
         
         # Draw main white arc
         self.canvas.create_arc(
             padding, padding, w - padding, h - padding,
             start=self.angle, extent=90,
-            outline='white', width=3, style="arc"
+            outline='white', width=5, style="arc"
         )
     
     def _spin(self):
         """Animation loop."""
         if self.is_spinning and self.window:
-            self.angle = (self.angle - 10) % 360
+            self.angle = (self.angle - 5) % 360  # Smaller step for smoother rotation
             self._draw()
             self._update_position()
-            self.timer_id = self.parent.after(20, self._spin)
+            self.timer_id = self.parent.after(16, self._spin)  # ~60fps for smooth animation
     
     def _update_position(self):
         """Keep spinner centered on parent."""
@@ -474,9 +475,9 @@ class LoadingSpinner:
             py = self.parent.winfo_rooty()
             pw = self.parent.winfo_width()
             ph = self.parent.winfo_height()
-            x = px + (pw // 2) - (self.size // 2)
+            x = px + (pw // 2) - (self.window_width // 2)
             y = py + (ph // 2) - (self.window_height // 2)
-            self.window.geometry(f"{self.size}x{self.window_height}+{x}+{y}")
+            self.window.geometry(f"{self.window_width}x{self.window_height}+{x}+{y}")
         except:
             pass
     
@@ -509,10 +510,10 @@ class LoadingSpinner:
         except:
             pass
         
-        # Create canvas for spinner
+        # Create canvas for spinner (centered in wider window)
         self.canvas = tk.Canvas(self.window, width=self.size, height=self.size,
                                bg=self.chroma_key, highlightthickness=0)
-        self.canvas.pack()
+        self.canvas.pack(anchor='center')
         
         # Speed label below spinner
         self.speed_label = tk.Label(self.window, text=self.speed_text, 

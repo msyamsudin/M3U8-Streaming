@@ -922,10 +922,10 @@ class M3U8StreamingPlayer:
         # Restore cursor
         self.root.config(cursor="")
         
-        # Restore menu
-        # Restore menu bar
-        self.menu_bar.pack(side=tk.TOP, fill=tk.X, before=self.main_container)
-        self.menu_separator.pack(side=tk.TOP, fill=tk.X, before=self.main_container)
+        # Restore menu bar only if it was visible before fullscreen
+        if self.menu_visible:
+            self.menu_bar.pack(side=tk.TOP, fill=tk.X, before=self.main_container)
+            self.menu_separator.pack(side=tk.TOP, fill=tk.X, before=self.main_container)
         
         # Restore Custom Title Bar (Packed First)
         if hasattr(self, 'title_bar'):
