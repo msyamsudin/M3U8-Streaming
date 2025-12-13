@@ -87,6 +87,33 @@ class M3U8StreamingPlayer:
             @self.player.mpv.key_binding('MOUSE_BTN0_DBL')
             def on_mpv_dbl_click(state=None, name=None, char=None):
                 self.root.after(0, self.handle_double_click)
+
+            # Observe buffering and state
+            @self.player.mpv.property_observer('core-idle')
+            def on_core_idle(name, value):
+                if self.is_closing: return
+                # Only show spinner if not manually paused
+                is_paused = self.player.mpv.pause if self.player and self.player.mpv else False
+                if value and not is_paused:
+                    self.root.after(0, self.spinner.start)
+                else:
+                    self.root.after(0, self.spinner.stop)
+                    
+            @self.player.mpv.property_observer('paused-for-cache')
+            def on_paused_for_cache(name, value):
+                if self.is_closing: return
+                # Only show spinner if not manually paused
+                is_paused = self.player.mpv.pause if self.player and self.player.mpv else False
+                if value and not is_paused:
+                    self.root.after(0, self.spinner.start)
+                else:
+                    self.root.after(0, self.spinner.stop)
+            
+            @self.player.mpv.property_observer('eof-reached')
+            def on_eof_reached(name, value):
+                if self.is_closing: return
+                if value:
+                    self.root.after(0, self.stop_stream)
         
         # Start periodic updates
         self.update_player_info()
@@ -528,34 +555,8 @@ class M3U8StreamingPlayer:
                 self.is_playing = True
                 self.root.after(0, self._on_play_start)
                 
-                # Observe buffering
-                @self.player.mpv.property_observer('core-idle')
-                def on_core_idle(name, value):
-                    if self.is_closing: return
-                    # Only show spinner if not manually paused
-                    is_paused = self.player.mpv.pause if self.player and self.player.mpv else False
-                    if value and not is_paused:
-                        self.root.after(0, self.spinner.start)
-                    else:
-                        self.root.after(0, self.spinner.stop)
-                        
-                @self.player.mpv.property_observer('paused-for-cache')
-                def on_paused_for_cache(name, value):
-                    if self.is_closing: return
-                    # Only show spinner if not manually paused
-                    is_paused = self.player.mpv.pause if self.player and self.player.mpv else False
-                    if value and not is_paused:
-                        self.root.after(0, self.spinner.start)
-                    else:
-                        self.root.after(0, self.spinner.stop)
-                
-                @self.player.mpv.property_observer('eof-reached')
-                def on_eof_reached(name, value):
-                    if self.is_closing: return
-                    if value:
-                        self.root.after(0, self.stop_stream)
-                
         except Exception as e:
+            self.root.after(0, lambda: show_custom_error(self.root, "Error", str(e)))
             self.root.after(0, lambda: show_custom_error(self.root, "Error", str(e)))
 
     def _on_play_start(self):
@@ -583,9 +584,13 @@ class M3U8StreamingPlayer:
                 self._retry_seek(pos)
             
             # Resume playback after decision
-            if self.player and self.player.mpv:
-                self.player.mpv.pause = False
-                self.play_btn.config(text="⏸")
+            if not self.is_closing and self.player and self.player.mpv:
+                try:
+                    self.player.mpv.pause = False
+                    self.play_btn.config(text="⏸")
+                except Exception:
+                    # Ignore errors if player is dead/closing
+                    pass
 
     def _retry_seek(self, pos, attempt=1):
         """Try to seek to the position, retrying if MPV is not ready."""
