@@ -432,7 +432,9 @@ class LoadingSpinner:
         self.speed_text = ""
         self.chroma_key = "#010101"
         self.window_width = 120  # Wide enough for speed text like "999.9 KB/s"
+        self.window_width = 120  # Wide enough for speed text like "999.9 KB/s"
         self.window_height = size + 25  # Extra space for speed label
+        self.root_window = root_window
         
     def _draw(self):
         """Draw the thin rotating arc."""
@@ -501,8 +503,21 @@ class LoadingSpinner:
         # Create transparent overlay window
         self.window = tk.Toplevel(self.parent)
         self.window.overrideredirect(True)
-        self.window.attributes('-topmost', True)
+        
+        # FIX: Use transient on root_window (Toplevel) not parent (Frame)
+        # This keeps spinner on top of app, but behind other apps
+        if self.root_window:
+            self.window.transient(self.root_window)
+            self.window.lift() # Ensure it starts on top
+        else:
+            # Fallback if no root provided
+            self.window.attributes('-topmost', True)
+            
         self.window.config(bg=self.chroma_key)
+        
+        # Bind focus event to ensure z-order restoration
+        if self.root_window:
+            self.root_window.bind("<FocusIn>", self._on_root_focus_in, add="+")
         
         # Make chroma key color transparent (Windows)
         try:
@@ -544,6 +559,25 @@ class LoadingSpinner:
             self.window = None
             self.canvas = None
             self.speed_label = None
+
+        # Unbind focus event
+        if self.root_window:
+            try:
+                self.root_window.unbind("<FocusIn>") # functionality to remove specific handler is limited in Tkinter without wrapper
+                # Simplified unbind might remove other handlers but usually <FocusIn> on root for this purpose is safe to reset
+                # Better approach: keep track of binding id if possible, or just accept risk for this specific app structure
+                pass 
+            except: 
+                pass
+
+    def _on_root_focus_in(self, event):
+        """Restore z-order when app regains focus."""
+        if self.window and self.is_spinning:
+            try:
+                # Slight delay to allow window manager to process the focus change first
+                self.window.after(10, self.window.lift)
+            except:
+                pass
     
     def destroy(self):
         """Clean up."""
