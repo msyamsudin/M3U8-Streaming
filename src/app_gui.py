@@ -455,7 +455,6 @@ class M3U8StreamingPlayer:
         else:
             self.config_panel.pack(fill=tk.X, side=tk.TOP, before=self.video_frame, padx=4, pady=4)
             self.show_config = True
-            self.url_entry.focus_set()
 
     def toggle_history(self):
         self.show_history = not self.show_history
