@@ -4,15 +4,11 @@
 ![Platform](https://img.shields.io/badge/Platform-Windows-green)
 [![License: MIT](https://img.shields.io/badge/License-MIT-orange)](https://github.com/msyamsudin/M3U8-Streaming/blob/main/LICENSE)
 
-Pemutar streaming berbasis **HLS (.m3u8)** dengan **riwayat URL**, **continue watching**, dan dibangun menggunakan **Python (Tkinter) + MPV**.
+Pemutar streaming berbasis **HLS (.m3u8)** dengan kemampuan **Custom Headers** dan dibangun menggunakan **Python (Tkinter) + MPV**.
 
 ---
 
-<img width="1315" height="916" alt="image" src="https://github.com/user-attachments/assets/fd30c7ea-b919-4af3-972f-ceac52ca7a44" />
-
----
-
-<img width="1315" height="916" alt="image" src="https://github.com/user-attachments/assets/c3d3657d-cb5d-401e-b9d1-12cae2b2ef61" />
+<img width="1472" height="1047" alt="image" src="https://github.com/user-attachments/assets/7780eaf0-f128-4dcd-9bae-88c90325cac7" />
 
 ---
 
