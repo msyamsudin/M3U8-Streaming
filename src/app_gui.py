@@ -441,6 +441,7 @@ class M3U8StreamingPlayer:
 
         # Initialize hidden/extra controls
         self.volume_hide_timer = None
+        self.volume_show_timer = None
         
         # Quality Combo
         self.quality_var = tk.StringVar()
@@ -743,10 +744,16 @@ class M3U8StreamingPlayer:
             self.root.after_cancel(self.volume_hide_timer)
             self.volume_hide_timer = None
         
-        # Animate open
-        self.animate_volume_width(self.vol_target_width)
+        # Animate open with delay to prevent accidental triggers
+        if self.volume_show_timer:
+            self.root.after_cancel(self.volume_show_timer)
+        self.volume_show_timer = self.root.after(250, lambda: self.animate_volume_width(self.vol_target_width))
 
     def on_volume_leave(self, event):
+        if self.volume_show_timer:
+            self.root.after_cancel(self.volume_show_timer)
+            self.volume_show_timer = None
+            
         if self.volume_hide_timer:
             self.root.after_cancel(self.volume_hide_timer)
         self.volume_hide_timer = self.root.after(300, self.hide_volume_controls)
