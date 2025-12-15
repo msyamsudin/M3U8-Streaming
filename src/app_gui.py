@@ -594,14 +594,21 @@ class M3U8StreamingPlayer:
 
     def _retry_seek(self, pos, attempt=1):
         """Try to seek to the position, retrying if MPV is not ready."""
-        try:
-            self.player.seek(pos, "absolute")
-        except Exception as e:
-            if attempt <= 3:
-                print(f"Seek failed (attempt {attempt}): {e}. Retrying in 1s...")
-                self.root.after(1000, lambda: self._retry_seek(pos, attempt + 1))
+        # Check if player is ready and seekable
+        if self.player and self.player.is_seekable():
+            try:
+                self.player.seek(pos, "absolute")
+            except Exception as e:
+                # Actual seeking error (unexpected)
+                print(f"Seek command failed: {e}")
+                show_custom_error(self.root, "Error", f"Failed to seek: {e}")
+        else:
+            # Player not ready yet
+            if attempt <= 10: # Increased attempts since we are just checking property
+                # print(f"Player not seekable yet (attempt {attempt}). Retrying in 0.5s...")
+                self.root.after(500, lambda: self._retry_seek(pos, attempt + 1))
             else:
-                show_custom_error(self.root, "Error", f"Failed to resume playback after multiple attempts.\n{e}")
+                show_custom_error(self.root, "Error", "Failed to resume: Stream is not seekable or timed out.")
 
     def update_quality_list(self):
         if not self.player: return

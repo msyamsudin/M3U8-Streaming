@@ -127,3 +127,12 @@ class MpvPlayer:
             except:
                 return None
         return None
+        
+    def is_seekable(self):
+        """Check if the current stream is seekable."""
+        if self.mpv:
+            try:
+                return self.mpv.seekable
+            except:
+                return False
+        return False
