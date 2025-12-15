@@ -89,23 +89,6 @@ python main.py
 
 ---
 
-## 🎨 Kustomisasi Warna
-
-Semua warna UI dapat dikustomisasi melalui file `src/config.py`:
-
-```python
-COLORS = {
-    'bg': '#0f0f0f',              # Background
-    'accent': '#007ACC',          # Accent color (seekbar, status)
-    'load_btn_bg': '#007ACC',     # Load button
-    'speed_fg': '#007ACC',        # Speed indicator
-    'status_playing_fg': '#007ACC', # Status saat playing
-    # ... dan banyak lagi
-}
-```
-
----
-
 ## 🔗 URL Contoh untuk Uji Coba
 
 ```
