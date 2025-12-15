@@ -24,9 +24,7 @@ Pemutar streaming berbasis **HLS (.m3u8)** dengan **riwayat URL**, **continue wa
 | 🕒 **Riwayat URL** | Menyimpan URL yang baru diputar |
 | ⏯️ **Continue Watching** | Resume otomatis dari posisi terakhir |
 | 📊 **Speed Indicator** | Indikator kecepatan download real-time |
-| 🎨 **UI Modern** | Tema gelap mirip MPC-HC dengan customizable colors |
-| 🎚️ **Quality Selector** | Pilih kualitas video untuk adaptive streaming |
-| ⌨️ **Shortcut Lengkap** | Kontrol cepat layaknya video player profesional |
+| 🕵️ **Custom Headers** | Mendukung pengaturan Custom Referer dan User Agent |
 
 ---
 
