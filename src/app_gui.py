@@ -50,6 +50,7 @@ class M3U8StreamingPlayer:
         self.drag_start_x = 0
         self.drag_start_y = 0
         self.is_dragging = False
+        self.possible_click = False
 
         # Settings
         self.settings = load_settings()
