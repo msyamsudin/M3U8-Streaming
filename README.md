@@ -20,7 +20,8 @@ Pemutar streaming berbasis **HLS (.m3u8)** dengan kemampuan **Custom Headers** d
 | 🕒 **Riwayat URL** | Menyimpan URL yang baru diputar |
 | ⏯️ **Continue Watching** | Resume otomatis dari posisi terakhir |
 | 📊 **Speed Indicator** | Indikator kecepatan download real-time |
-| 🕵️ **Custom Headers** | Mendukung pengaturan Custom Referer dan User Agent |
+| �️ **Debug Overlay** | Statistik RAM, Buffer, dan Grafik (Ctrl+D) |
+| �🕵️ **Custom Headers** | Mendukung pengaturan Custom Referer dan User Agent |
 
 ---
 
@@ -86,6 +87,8 @@ python main.py
 | `Ctrl + O`                | Input URL Stream       |
 | `Esc`                     | Keluar dari Fullscreen |
 | `H`                       | Tampilkan Riwayat      |
+| `Ctrl + D`                | **Debug Overlay & RAM Stats** |
+| `F1`                      | Keyboard Shortcuts     |
 
 ---
 
