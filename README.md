@@ -20,7 +20,7 @@ Pemutar streaming berbasis **HLS (.m3u8)** dengan kemampuan **Custom Headers** d
 | 🕒 **Riwayat URL** | Menyimpan URL yang baru diputar |
 | ⏯️ **Continue Watching** | Resume otomatis dari posisi terakhir |
 | 🚀 **Cache Tuning** | Atur RAM Cache (Forward/Back) secara real-time |
-| 🔄 **Auto-Refresh** | Reload stream otomatis jika pause > 5 menit |
+| 🔄 **Auto-Refresh** | Reload stream otomatis jika pause > 1 menit |
 | 📊 **Speed Indicator** | Indikator kecepatan download real-time |
 | 🛠️ **Debug Overlay** | Statistik RAM, Buffer, dan Konfigurasi Cache (Ctrl+D) |
 | 🕵️ **Custom Headers** | Mendukung pengaturan Custom Referer dan User Agent |
