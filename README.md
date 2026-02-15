@@ -19,9 +19,11 @@ Pemutar streaming berbasis **HLS (.m3u8)** dengan kemampuan **Custom Headers** d
 | 🎬 **Pemutaran Stream** | Mendukung HLS (.m3u8) |
 | 🕒 **Riwayat URL** | Menyimpan URL yang baru diputar |
 | ⏯️ **Continue Watching** | Resume otomatis dari posisi terakhir |
+| 🚀 **Cache Tuning** | Atur RAM Cache (Forward/Back) secara real-time |
+| 🔄 **Auto-Refresh** | Reload stream otomatis jika pause > 5 menit |
 | 📊 **Speed Indicator** | Indikator kecepatan download real-time |
-| �️ **Debug Overlay** | Statistik RAM, Buffer, dan Grafik (Ctrl+D) |
-| �🕵️ **Custom Headers** | Mendukung pengaturan Custom Referer dan User Agent |
+| 🛠️ **Debug Overlay** | Statistik RAM, Buffer, dan Konfigurasi Cache (Ctrl+D) |
+| 🕵️ **Custom Headers** | Mendukung pengaturan Custom Referer dan User Agent |
 
 ---
 
@@ -107,3 +109,5 @@ https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
 | Video tidak tampil          | Pastikan `libmpv-2.dll` sudah ditempatkan dengan benar     |
 | Error `ModuleNotFoundError` | Install library: `pip install python-mpv requests`         |
 | Streaming lag/stutter       | Cek koneksi internet, bitrate tinggi butuh bandwidth lebih |
+| Streaming lag/frozzen       | Gunakan fitur **Cache Tuning** untuk menyesuaikan Forward Cache |
+| Stream mati setelah pause   | Fitur **Auto-Refresh** akan menangani ini secara otomatis  |
