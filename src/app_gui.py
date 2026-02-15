@@ -1174,6 +1174,7 @@ class M3U8StreamingPlayer:
             ("", ""),
             ("Other", ""),
             ("Ctrl+O", "Open Stream URL Dialog"),
+            ("Ctrl+D", "Toggle Debug Overlay & RAM Stats"),
             ("F1", "Show Keyboard Shortcuts"),
         ]
         
