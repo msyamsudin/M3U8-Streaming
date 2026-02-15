@@ -43,7 +43,7 @@ class M3U8StreamingPlayer:
         
         # Pause & Refresh State
         self.pause_start_time = None
-        self.PAUSE_REFRESH_THRESHOLD = 300 # 5 minutes
+        self.PAUSE_REFRESH_THRESHOLD = 60 # 1 minute
         
         # Fullscreen state
         self.normal_geometry = None
@@ -321,7 +321,7 @@ class M3U8StreamingPlayer:
         # Don't pack initially
         
         self.debug_labels = {}
-        stats = ["Cache Size", "Buffer Duration", "Network Speed", "Active URL"]
+        stats = ["Cache Size", "Buffer Duration", "Network Speed", "Refresh In", "Active URL"]
         
         for i, stat in enumerate(stats):
             lbl_name = tk.Label(self.debug_frame, text=f"{stat}:", bg='#000000', fg='#00FF00', 
@@ -406,7 +406,15 @@ class M3U8StreamingPlayer:
                 speed = self.format_speed(rate)
                 self.debug_labels["Network Speed"].config(text=speed)
             
-            # 4. URL (truncated)
+            # 4. Refresh In (Added)
+            if self.pause_start_time and self.player and self.player.mpv.pause:
+                elapsed = time.time() - self.pause_start_time
+                remaining = max(0, self.PAUSE_REFRESH_THRESHOLD - elapsed)
+                self.debug_labels["Refresh In"].config(text=f"{int(remaining)}s")
+            else:
+                self.debug_labels["Refresh In"].config(text="N/A")
+
+            # 5. URL (truncated)
             url = self.current_url
             if len(url) > 40: url = url[:37] + "..."
             self.debug_labels["Active URL"].config(text=url)
