@@ -3,9 +3,10 @@ from tkinter import ttk, messagebox, Menu, filedialog
 import threading
 import os
 import requests
+import time
 from datetime import datetime
 
-from .config import COLORS, USER_AGENTS
+from .config import COLORS, USER_AGENTS, CACHE_SETTINGS
 from .player_core import MpvPlayer
 from .ui_components import StyledButton, PrimaryButton, HistoryPanel, LoadingSpinner, BufferedScale, CustomTitleBar, apply_custom_window_style, show_custom_error, show_custom_warning, show_custom_info, ask_custom_yes_no
 from .utils import format_time, load_history, save_history, get_unique_filename, write_history, update_history_progress, get_history_item, load_settings, save_settings
@@ -39,6 +40,10 @@ class M3U8StreamingPlayer:
         self.cache_history = [] # For graph (MB)
         self.previous_volume = 100
         self.is_closing = False
+        
+        # Pause & Refresh State
+        self.pause_start_time = None
+        self.PAUSE_REFRESH_THRESHOLD = 300 # 5 minutes
         
         # Fullscreen state
         self.normal_geometry = None
@@ -462,6 +467,52 @@ class M3U8StreamingPlayer:
                                 state="readonly", font=('Segoe UI', 9))
         ua_combo.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
+        # Row 3: Cache Tuning (Added)
+        row3 = tk.Frame(self.config_panel, bg=COLORS['bg'])
+        row3.pack(fill=tk.X, pady=(8, 0))
+
+        # Max Bytes (MB)
+        tk.Label(row3, text="Forward Cache (MB):", bg=COLORS['bg'], fg=COLORS['text_gray'], font=('Segoe UI', 9), width=15, anchor=tk.W).pack(side=tk.LEFT, padx=(0, 8))
+        self.cache_bytes_entry = tk.Entry(row3, font=('Segoe UI', 9), bg=COLORS['entry_bg'], fg=COLORS['entry_fg'], width=10)
+        self.cache_bytes_entry.insert(0, str(CACHE_SETTINGS['max_bytes']))
+        self.cache_bytes_entry.pack(side=tk.LEFT, padx=(0, 20))
+
+        # Max Back Bytes (MB)
+        tk.Label(row3, text="Back Cache (MB):", bg=COLORS['bg'], fg=COLORS['text_gray'], font=('Segoe UI', 9)).pack(side=tk.LEFT, padx=(0, 8))
+        self.cache_back_entry = tk.Entry(row3, font=('Segoe UI', 9), bg=COLORS['entry_bg'], fg=COLORS['entry_fg'], width=10)
+        self.cache_back_entry.insert(0, str(CACHE_SETTINGS['max_back_bytes']))
+        self.cache_back_entry.pack(side=tk.LEFT, padx=(0, 10))
+
+        # Apply Button
+        PrimaryButton(row3, text="Apply", command=self._apply_current_cache_settings_ui).pack(side=tk.LEFT, padx=(0, 10))
+
+        # Status Label (Flash feedback)
+        self.cache_status_label = tk.Label(row3, text="", bg=COLORS['bg'], font=('Segoe UI', 8))
+        self.cache_status_label.pack(side=tk.LEFT)
+
+        # Bind Enter key to apply
+        self.cache_bytes_entry.bind('<Return>', lambda e: self._apply_current_cache_settings_ui())
+        self.cache_back_entry.bind('<Return>', lambda e: self._apply_current_cache_settings_ui())
+
+        # Reset Defaults Button (Compact)
+        tk.Button(row3, text="Reset Defaults", command=self.reset_cache_settings,
+                  bg=COLORS['button_bg'], fg=COLORS['text_gray'], activebackground=COLORS['button_hover'],
+                  activeforeground=COLORS['text'], bd=0, padx=8, pady=0, font=('Segoe UI', 8, 'bold'),
+                  cursor="hand2").pack(side=tk.RIGHT)
+
+    def reset_cache_settings(self):
+        """Reset cache tuning entries to default values."""
+        self.cache_bytes_entry.delete(0, tk.END)
+        self.cache_bytes_entry.insert(0, str(CACHE_SETTINGS['max_bytes']))
+        
+        self.cache_back_entry.delete(0, tk.END)
+        self.cache_back_entry.insert(0, str(CACHE_SETTINGS['max_back_bytes']))
+        
+        # Apply immediately if player is active
+        if self.player:
+            self.player.apply_cache_settings(CACHE_SETTINGS['max_bytes'], 
+                                           CACHE_SETTINGS['max_back_bytes'])
+
     def copy_url(self):
         if self.current_url:
             self.root.clipboard_clear()
@@ -578,7 +629,6 @@ class M3U8StreamingPlayer:
     
     def toggle_menu_bar(self):
         """Toggle menu bar visibility with ALT key."""
-        import time
         current_time = time.time()
         
         # Debounce - ignore if called within 200ms
@@ -624,6 +674,14 @@ class M3U8StreamingPlayer:
         url = self.url_entry.get().strip()
         ref = self.referer_entry.get().strip()
         ua = USER_AGENTS[self.ua_var.get()]
+        
+        # Get cache settings in main thread
+        try:
+            max_b = int(self.cache_bytes_entry.get())
+            back_b = int(self.cache_back_entry.get())
+        except:
+            max_b = CACHE_SETTINGS['max_bytes']
+            back_b = CACHE_SETTINGS['max_back_bytes']
 
         # Check if URL is placeholder or empty
         if not url or url == "Enter M3U8 stream URL...":
@@ -646,10 +704,10 @@ class M3U8StreamingPlayer:
             self.config_panel.pack_forget()
             self.show_config = False
             
-        # Threaded load
-        threading.Thread(target=self._load_thread, args=(url, ref, ua), daemon=True).start()
+        # Threaded load (pass cache values)
+        threading.Thread(target=self._load_thread, args=(url, ref, ua, max_b, back_b), daemon=True).start()
 
-    def _load_thread(self, url, ref, ua):
+    def _load_thread(self, url, ref, ua, max_b=None, back_b=None):
         try:
             # Check URL validity first
             headers = {"Referer": ref, "User-Agent": ua}
@@ -659,7 +717,10 @@ class M3U8StreamingPlayer:
                 return
 
             if self.player:
-                self.player.stop()
+                # Apply Cache Settings BEFORE play
+                if max_b is not None:
+                    self.player.apply_cache_settings(max_b, back_b)
+                
                 self.player.play(url, headers={"Referer": ref}, user_agent=ua)
                 
                 self.is_playing = True
@@ -748,8 +809,16 @@ class M3U8StreamingPlayer:
         if self.player and self.player.pause():
             self.play_btn.config(text="▶")
             self.spinner.stop() # Ensure spinner is hidden when paused
+            self.pause_start_time = time.time() # Record pause time
         else:
+            # Check if we should refresh before resuming
+            if self.pause_start_time and (time.time() - self.pause_start_time > self.PAUSE_REFRESH_THRESHOLD):
+                self.pause_start_time = None
+                self.refresh_stream()
+                return # refresh_stream will handle setting button text
+
             self.play_btn.config(text="⏸")
+            self.pause_start_time = None
 
     def stop_stream(self):
         if self.player:
@@ -768,6 +837,72 @@ class M3U8StreamingPlayer:
             self.time_label_left.config(text="00:00:00")
             self.progress_scale.set_progress(0)
             self.progress_scale.set_buffer(0)
+
+    def refresh_stream(self):
+        """Perform a 'Medium Reset' by reloading the stream at current position."""
+        if not self.player or not self.current_url: return
+        
+        pos = self.player.get_time_pos()
+        if pos is None: pos = 0
+        
+        # Briefly show spinner
+        self.spinner.start()
+        
+        # Stop and Re-load
+        ref = self.referer_entry.get().strip()
+        ua = USER_AGENTS[self.ua_var.get()]
+        
+        self.player.stop()
+        
+        # Apply current cache settings BEFORE play
+        self._apply_current_cache_settings()
+        
+        self.player.play(self.current_url, headers={"Referer": ref}, user_agent=ua)
+
+        self.is_playing = True
+        self.play_btn.config(text="⏸")
+        
+        # Seek back to original position
+        self.root.after(500, lambda: self._retry_seek(pos))
+
+    def _apply_current_cache_settings_ui(self):
+        """Called from UI (Apply button or Enter) to apply and notify."""
+        success = self._apply_current_cache_settings()
+        
+        # UI Feedback
+        if success:
+            self.cache_status_label.config(text="✔ Applied", fg="#4CAF50")
+        else:
+            if self.is_playing:
+                self.cache_status_label.config(text="i Active on reload", fg="#FFA500")
+            else:
+                self.cache_status_label.config(text="✘ Error", fg="#FF5252")
+                
+        # Clear status after 3s
+        self.root.after(3000, lambda: self.cache_status_label.config(text=""))
+        
+        if self.show_debug:
+             self.update_debug_info()
+
+    def _apply_current_cache_settings(self):
+        """Helper to get settings from GUI and apply to player. Returns success boolean."""
+        if not self.player: return False
+        
+        try:
+            # Parse entries with default fallback if invalid
+            def safe_int(val, default):
+                try: 
+                    return int(val) if val.strip() else default
+                except: 
+                    return default
+
+            max_b = safe_int(self.cache_bytes_entry.get(), CACHE_SETTINGS['max_bytes'])
+            back_b = safe_int(self.cache_back_entry.get(), CACHE_SETTINGS['max_back_bytes'])
+            
+            return self.player.apply_cache_settings(max_b, back_b)
+        except Exception as e:
+            print(f"GUI Apply Cache error: {e}")
+            return False
 
 
 

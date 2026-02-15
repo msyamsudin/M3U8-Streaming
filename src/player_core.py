@@ -31,7 +31,8 @@ class MpvPlayer:
                 input_default_bindings=True,
                 input_vo_keyboard=True,
                 osc=True,
-                keep_open=True
+                keep_open=True,
+                cache='yes' # Explicitly enable caching
             )
         except Exception as e:
             raise RuntimeError(f"Failed to initialize MPV: {e}")
@@ -136,3 +137,38 @@ class MpvPlayer:
             except:
                 return False
         return False
+
+    def apply_cache_settings(self, max_bytes_mb=None, max_back_bytes_mb=None):
+        """
+        Apply cache tuning settings correctly using confirmed command('set', ...) method.
+        Returns True if applied successfully, False if any error occurred.
+        """
+        if not self.mpv:
+            return False
+
+        success = True
+        try:
+            # 1. Enable cache explicitly
+            self.mpv.command("set", "cache", "yes")
+
+            # 2. Apply Forward Cache (with validation)
+            if max_bytes_mb is not None and max_bytes_mb > 0:
+                max_bytes = str(int(max_bytes_mb * 1024 * 1024))
+                try:
+                    self.mpv.command("set", "demuxer-max-bytes", max_bytes)
+                except:
+                    success = False
+
+            # 3. Apply Back Cache (with validation)
+            if max_back_bytes_mb is not None and max_back_bytes_mb > 0:
+                max_back_bytes = str(int(max_back_bytes_mb * 1024 * 1024))
+                try:
+                    self.mpv.command("set", "demuxer-max-back-bytes", max_back_bytes)
+                except:
+                    success = False
+            
+            return success
+
+        except Exception as e:
+            print(f"Error applying cache settings ({max_bytes_mb}MB, {max_back_bytes_mb}MB): {e}")
+            return False
