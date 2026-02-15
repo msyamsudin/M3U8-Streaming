@@ -34,7 +34,9 @@ class M3U8StreamingPlayer:
         self.is_fullscreen = False
         self.show_config = True
         self.show_history = False
+        self.show_debug = False
         self.current_url = ""
+        self.cache_history = [] # For graph (MB)
         self.previous_volume = 100
         self.is_closing = False
         
@@ -178,6 +180,8 @@ class M3U8StreamingPlayer:
         self.root.bind("<space>", lambda e: self.toggle_play_pause())
         self.root.bind("<Control-o>", lambda e: self.show_open_dialog())
         self.root.bind("<Control-O>", lambda e: self.show_open_dialog())
+        self.root.bind("<Control-d>", lambda e: self.toggle_debug_overlay())
+        self.root.bind("<Control-D>", lambda e: self.toggle_debug_overlay())
         self.root.bind("<F1>", lambda e: self.show_shortcuts_dialog())
         self.root.bind("<Configure>", self.on_window_resize)
         
@@ -278,6 +282,9 @@ class M3U8StreamingPlayer:
         # Loading Spinner
         self.spinner = LoadingSpinner(self.video_frame, size=60, color='#00FF00', bg_color=COLORS['video_bg'], root_window=self.root)
         
+        # Debug Overlay
+        self.setup_debug_overlay()
+        
         # Control Panel
         self.setup_control_panel()
 
@@ -303,6 +310,108 @@ class M3U8StreamingPlayer:
                         font=('Segoe UI', 11))
         text1.pack()
         
+    def setup_debug_overlay(self):
+        """Create a transparent overlay for technical debugging info."""
+        self.debug_frame = tk.Frame(self.video_frame, bg='#000000', bd=1, relief=tk.SOLID)
+        # Don't pack initially
+        
+        self.debug_labels = {}
+        stats = ["Cache Size", "Buffer Duration", "Network Speed", "Active URL"]
+        
+        for i, stat in enumerate(stats):
+            lbl_name = tk.Label(self.debug_frame, text=f"{stat}:", bg='#000000', fg='#00FF00', 
+                               font=('Consolas', 9, 'bold'), anchor=tk.W)
+            lbl_name.grid(row=i, column=0, sticky=tk.W, padx=5, pady=1)
+            
+            lbl_val = tk.Label(self.debug_frame, text="N/A", bg='#000000', fg='#FFFFFF', 
+                              font=('Consolas', 9), anchor=tk.W)
+            lbl_val.grid(row=i, column=1, sticky=tk.W, padx=5, pady=1)
+            self.debug_labels[stat] = lbl_val
+
+        # Add Graph Canvas
+        self.debug_canvas = tk.Canvas(self.debug_frame, width=280, height=60, bg='#111111', highlightthickness=0)
+        self.debug_canvas.grid(row=len(stats), column=0, columnspan=2, pady=5, padx=5)
+        
+    def _draw_cache_graph(self):
+        """Draw a line chart of RAM cache occupancy (MB)."""
+        self.debug_canvas.delete("all")
+        if not self.cache_history: return
+        
+        w = 280
+        h = 60
+        max_points = 60
+        
+        # Calculate max MB for scaling
+        max_mb = max(self.cache_history) if self.cache_history else 0
+        if max_mb < 50: max_mb = 50 # Min 50MB scale
+        
+        # Draw background grid
+        for i in range(1, 4):
+            y = h - (i * h / 4)
+            self.debug_canvas.create_line(0, y, w, y, fill='#222222', dash=(2, 2))
+
+        # Plot points
+        points = []
+        for i, mb in enumerate(self.cache_history):
+            x = (i / (max_points - 1)) * w
+            # Inverse Y
+            y = h - (mb / max_mb) * (h - 5) - 2
+            points.extend([x, y])
+            
+        if len(points) >= 4:
+            self.debug_canvas.create_line(points, fill='#00FF00', width=1)
+            # Label max scale
+            self.debug_canvas.create_text(w-5, 5, text=f"{int(max_mb)}MB", fill="#555555", font=("Consolas", 7), anchor=tk.NE)
+
+    def toggle_debug_overlay(self):
+        self.show_debug = not self.show_debug
+        if self.show_debug:
+            self.debug_frame.place(x=10, y=10)
+            self.update_debug_info()
+        else:
+            self.debug_frame.place_forget()
+
+    def update_debug_info(self):
+        if not self.show_debug or not self.player: return
+        
+        try:
+            cache_state = self.player.get_demuxer_cache_state()
+            
+            # 1. Cache Size
+            if cache_state and 'fw-bytes' in cache_state:
+                size_mb = cache_state['fw-bytes'] / (1024 * 1024)
+                self.debug_labels["Cache Size"].config(text=f"{size_mb:.2f} MB")
+                
+                # Update history for graph (RAM occupancy)
+                self.cache_history.append(size_mb)
+                if len(self.cache_history) > 60:
+                    self.cache_history.pop(0)
+                self._draw_cache_graph()
+            
+            # 2. Buffer Duration
+            buf_dur = self.player.get_buffered_time()
+            cur_pos = self.player.get_time_pos()
+            if buf_dur and cur_pos:
+                rem_buf = max(0, buf_dur - cur_pos)
+                self.debug_labels["Buffer Duration"].config(text=f"{rem_buf:.1f} seconds")
+            
+            # 3. Network Speed
+            if cache_state and 'raw-input-rate' in cache_state:
+                rate = cache_state['raw-input-rate']
+                speed = self.format_speed(rate)
+                self.debug_labels["Network Speed"].config(text=speed)
+            
+            # 4. URL (truncated)
+            url = self.current_url
+            if len(url) > 40: url = url[:37] + "..."
+            self.debug_labels["Active URL"].config(text=url)
+            
+        except Exception as e:
+            print(f"Debug update error: {e}")
+            
+        if self.show_debug:
+            self.root.after(500, self.update_debug_info)
+
     def setup_config_panel(self):
         self.config_panel = tk.Frame(self.player_area, bg=COLORS['bg'], relief=tk.FLAT, bd=0)
         self.config_panel.pack(fill=tk.X, padx=10, pady=10)
