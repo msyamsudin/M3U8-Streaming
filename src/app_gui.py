@@ -340,20 +340,32 @@ class M3U8StreamingPlayer:
     def _draw_cache_graph(self):
         """Draw a line chart of RAM cache occupancy (MB)."""
         self.debug_canvas.delete("all")
-        if not self.cache_history: return
         
         w = 280
         h = 60
         max_points = 60
         
-        # Calculate max MB for scaling
+        # Get threshold value from entry
+        try:
+            threshold_mb = int(self.cache_bytes_entry.get())
+        except:
+            threshold_mb = CACHE_SETTINGS['max_bytes']
+
+        # Calculate max MB for scaling (at least threshold + 10%)
         max_mb = max(self.cache_history) if self.cache_history else 0
-        if max_mb < 50: max_mb = 50 # Min 50MB scale
+        scale_limit = threshold_mb * 1.2
+        if max_mb < scale_limit: max_mb = scale_limit
+        if max_mb < 50: max_mb = 50 
         
         # Draw background grid
         for i in range(1, 4):
             y = h - (i * h / 4)
             self.debug_canvas.create_line(0, y, w, y, fill='#222222', dash=(2, 2))
+
+        # Draw Threshold Line (Dashed)
+        ty = h - (threshold_mb / max_mb) * (h - 5) - 2
+        self.debug_canvas.create_line(0, ty, w, ty, fill='#FFA500', dash=(4, 4), width=1)
+        self.debug_canvas.create_text(5, ty-2, text=f"LIMIT: {threshold_mb}MB", fill="#FFA500", font=("Consolas", 7), anchor=tk.SW)
 
         # Plot points
         points = []
