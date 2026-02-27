@@ -172,3 +172,30 @@ class MpvPlayer:
         except Exception as e:
             print(f"Error applying cache settings ({max_bytes_mb}MB, {max_back_bytes_mb}MB): {e}")
             return False
+
+    def clear_cache(self):
+        """
+        Flush the demuxer cache (buffer) with fallback for older libmpv.
+        Squeezes cache limits to force discarding. Restoration should be handled
+        by the caller using apply_cache_settings after a short delay.
+        """
+        if not self.mpv:
+            return False
+            
+        try:
+            # Method 1: Modern command (best, seamless)
+            self.mpv.command("demuxer-cache-clear")
+            return True
+        except Exception:
+            # Method 2: Fallback (Aggressive Limit Squeeze & seek)
+            try:
+                # 1. Force discard by setting limits to minimum (1KB)
+                self.mpv.command("set", "demuxer-max-bytes", "1024")
+                self.mpv.command("set", "demuxer-max-back-bytes", "1024")
+                
+                # 2. Trigger flush with a tiny seek
+                self.mpv.command("seek", "0", "relative")
+                return True
+            except Exception as e:
+                print(f"Fallback squeeze cache error: {e}")
+                return False

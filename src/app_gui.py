@@ -526,7 +526,13 @@ class M3U8StreamingPlayer:
         tk.Button(row3, text="Reset Defaults", command=self.reset_cache_settings,
                   bg=COLORS['button_bg'], fg=COLORS['text_gray'], activebackground=COLORS['button_hover'],
                   activeforeground=COLORS['text'], bd=0, padx=8, pady=0, font=('Segoe UI', 8, 'bold'),
-                  cursor="hand2").pack(side=tk.RIGHT)
+                  cursor="hand2").pack(side=tk.RIGHT, padx=(0, 5))
+
+        # Delete Buffer Button (Compact)
+        tk.Button(row3, text="Delete Buffer", command=self.clear_player_cache,
+                  bg='#442222', fg=COLORS['text_gray'], activebackground='#663333',
+                  activeforeground=COLORS['text'], bd=0, padx=8, pady=0, font=('Segoe UI', 8, 'bold'),
+                  cursor="hand2").pack(side=tk.RIGHT, padx=(0, 5))
 
     def reset_cache_settings(self):
         """Reset cache tuning entries to default values."""
@@ -544,6 +550,38 @@ class M3U8StreamingPlayer:
         if self.player:
             self.player.apply_cache_settings(CACHE_SETTINGS['max_bytes'], 
                                            CACHE_SETTINGS['max_back_bytes'])
+
+    def clear_player_cache(self):
+        """Manually clear the player's demuxer cache with a two-step squeeze-restore sequence."""
+        if self.player:
+            # 1. Capture current UI settings to restore later
+            try:
+                max_b = int(self.cache_bytes_entry.get())
+                back_b = int(self.cache_back_entry.get())
+            except:
+                max_b = CACHE_SETTINGS['max_bytes']
+                back_b = CACHE_SETTINGS['max_back_bytes']
+                
+            # 2. Step 1: Squeeze and Flush
+            if self.player.clear_cache():
+                self.show_cache_status("Flushing buffer...", COLORS['accent'], duration=1000)
+                # 3. Step 2: Restore after delay (ensures flush is acknowledged)
+                self.root.after(200, lambda: self._finalize_clear_cache(max_b, back_b))
+            else:
+                self.show_cache_status("Failed to clear", COLORS['status_stopped_fg'])
+        else:
+            show_custom_warning(self.root, "Warning", "Player not initialized")
+
+    def _finalize_clear_cache(self, max_b, back_b):
+        """Step 2 of the flush sequence: Restore original cache limits."""
+        if self.player:
+            self.player.apply_cache_settings(max_b, back_b)
+            self.show_cache_status("Buffer cleared", COLORS['status_playing_fg'])
+
+    def show_cache_status(self, text, color, duration=3000):
+        """Show temporary feedback in the cache status label."""
+        self.cache_status_label.config(text=text, fg=color)
+        self.root.after(duration, lambda: self.cache_status_label.config(text=""))
 
     def copy_url(self):
         if self.current_url:

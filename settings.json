@@ -1,3 +1,4 @@
 {
-  "control_layout": "split"
+  "control_layout": "split",
+  "pause_refresh_threshold": 60
 }
