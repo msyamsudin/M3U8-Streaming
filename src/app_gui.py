@@ -28,6 +28,9 @@ class M3U8StreamingPlayer:
         self.setup_custom_window()
         # ----------------------------------------
         
+        # Settings
+        self.settings = load_settings()
+
         # State
         self.player = None
         self.is_playing = False
@@ -43,7 +46,7 @@ class M3U8StreamingPlayer:
         
         # Pause & Refresh State
         self.pause_start_time = None
-        self.PAUSE_REFRESH_THRESHOLD = 60 # 1 minute
+        self.PAUSE_REFRESH_THRESHOLD = self.settings.get('pause_refresh_threshold', CACHE_SETTINGS['pause_refresh_threshold'])
         
         # Fullscreen state
         self.normal_geometry = None
@@ -59,8 +62,6 @@ class M3U8StreamingPlayer:
         self.is_dragging = False
         self.possible_click = False
 
-        # Settings
-        self.settings = load_settings()
 
         # Initialize UI first (fast)
         self.setup_styles()
@@ -501,7 +502,13 @@ class M3U8StreamingPlayer:
         tk.Label(row3, text="Back Cache (MB):", bg=COLORS['bg'], fg=COLORS['text_gray'], font=('Segoe UI', 9)).pack(side=tk.LEFT, padx=(0, 8))
         self.cache_back_entry = tk.Entry(row3, font=('Segoe UI', 9), bg=COLORS['entry_bg'], fg=COLORS['entry_fg'], width=10)
         self.cache_back_entry.insert(0, str(CACHE_SETTINGS['max_back_bytes']))
-        self.cache_back_entry.pack(side=tk.LEFT, padx=(0, 10))
+        self.cache_back_entry.pack(side=tk.LEFT, padx=(0, 20))
+
+        # Pause Refresh (s)
+        tk.Label(row3, text="Pause Refresh (s):", bg=COLORS['bg'], fg=COLORS['text_gray'], font=('Segoe UI', 9)).pack(side=tk.LEFT, padx=(0, 8))
+        self.pause_threshold_entry = tk.Entry(row3, font=('Segoe UI', 9), bg=COLORS['entry_bg'], fg=COLORS['entry_fg'], width=10)
+        self.pause_threshold_entry.insert(0, str(self.PAUSE_REFRESH_THRESHOLD))
+        self.pause_threshold_entry.pack(side=tk.LEFT, padx=(0, 10))
 
         # Apply Button
         PrimaryButton(row3, text="Apply", command=self._apply_current_cache_settings_ui).pack(side=tk.LEFT, padx=(0, 10))
@@ -513,6 +520,7 @@ class M3U8StreamingPlayer:
         # Bind Enter key to apply
         self.cache_bytes_entry.bind('<Return>', lambda e: self._apply_current_cache_settings_ui())
         self.cache_back_entry.bind('<Return>', lambda e: self._apply_current_cache_settings_ui())
+        self.pause_threshold_entry.bind('<Return>', lambda e: self._apply_current_cache_settings_ui())
 
         # Reset Defaults Button (Compact)
         tk.Button(row3, text="Reset Defaults", command=self.reset_cache_settings,
@@ -528,6 +536,10 @@ class M3U8StreamingPlayer:
         self.cache_back_entry.delete(0, tk.END)
         self.cache_back_entry.insert(0, str(CACHE_SETTINGS['max_back_bytes']))
         
+        self.pause_threshold_entry.delete(0, tk.END)
+        self.pause_threshold_entry.insert(0, str(CACHE_SETTINGS['pause_refresh_threshold']))
+        self.PAUSE_REFRESH_THRESHOLD = CACHE_SETTINGS['pause_refresh_threshold']
+
         # Apply immediately if player is active
         if self.player:
             self.player.apply_cache_settings(CACHE_SETTINGS['max_bytes'], 
@@ -918,6 +930,14 @@ class M3U8StreamingPlayer:
 
             max_b = safe_int(self.cache_bytes_entry.get(), CACHE_SETTINGS['max_bytes'])
             back_b = safe_int(self.cache_back_entry.get(), CACHE_SETTINGS['max_back_bytes'])
+            pause_t = safe_int(self.pause_threshold_entry.get(), CACHE_SETTINGS['pause_refresh_threshold'])
+            
+            # Update local threshold
+            self.PAUSE_REFRESH_THRESHOLD = pause_t
+            
+            # Save to persistent settings
+            self.settings['pause_refresh_threshold'] = pause_t
+            save_settings(self.settings)
             
             return self.player.apply_cache_settings(max_b, back_b)
         except Exception as e:

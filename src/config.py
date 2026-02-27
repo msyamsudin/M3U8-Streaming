@@ -63,6 +63,7 @@ USER_AGENTS = {
 #  Cache Tuning Defaults
 # -------------------------------------------------
 CACHE_SETTINGS = {
-    "max_bytes": 50,       # MB
-    "max_back_bytes": 1,   # MB
+    "max_bytes": 100,       # MB
+    "max_back_bytes": 100,   # MB
+    "pause_refresh_threshold": 300, # Seconds (5 minutes)
 }
