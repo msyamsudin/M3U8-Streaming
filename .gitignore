@@ -22,6 +22,7 @@ history.json
 *.log
 
 # MPV DLLs (Large files, should be downloaded separately)
+libmpv-2.dll.old
 libmpv-2.dll
 mpv-1.dll
 mpv/
