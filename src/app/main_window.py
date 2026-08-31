@@ -864,6 +864,12 @@ class MainWindow(QMainWindow):
 
         layout.addStretch(1)
 
+        self._speed_label = QLabel("-")
+        self._speed_label.setStyleSheet(
+            "color: #3b82f6; font-family: Consolas, monospace; font-size: 8pt; background: transparent;"
+        )
+        layout.addWidget(self._speed_label)
+
         self._wid_label = QLabel("wid: -")
         self._wid_label.setStyleSheet("color: #71717a; font-family: Consolas, monospace; font-size: 8pt; background: transparent;")
         layout.addWidget(self._wid_label)
@@ -937,15 +943,17 @@ class MainWindow(QMainWindow):
             self._debug_overlay.update_stats({"volume": f"{volume}"})
 
     def _on_player_network_speed(self, bps: float) -> None:
-        if self._debug_overlay is None or not self._debug_visible:
-            return
         if bps >= 1024 * 1024:
             text = f"{bps / (1024 * 1024):.2f} MB/s"
         elif bps >= 1024:
             text = f"{bps / 1024:.1f} KB/s"
         else:
             text = f"{bps:.0f} B/s"
-        self._debug_overlay.update_stats({"speed": text})
+        # Label speed selalu tampil di info bar; overlay debug hanya saat terlihat.
+        if self._speed_label is not None:
+            self._speed_label.setText(text)
+        if self._debug_overlay is not None and self._debug_visible:
+            self._debug_overlay.update_stats({"speed": text})
 
     def _on_player_cache_state(self, cache_state: object) -> None:
         if not isinstance(cache_state, dict) or not self._debug_visible:
@@ -1029,6 +1037,8 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(500, self._maybe_prompt_resume)
         elif state in (PlayerState.STOPPED, PlayerState.ERROR, PlayerState.IDLE):
             self._pause_started_at = None
+            if self._speed_label is not None:
+                self._speed_label.setText("-")
         if self._debug_overlay is not None:
             self._debug_overlay.update_stats({"state": state})
         # Show / hide placeholder based on player state

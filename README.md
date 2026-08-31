@@ -20,14 +20,14 @@ Pemutar streaming berbasis **HLS (.m3u8)** dengan dukungan **Referer/User-Agent 
 | ⏯️ **Continue Watching** | Menawarkan resume dari posisi terakhir |
 | 🚀 **Cache Tuning** | Input forward/back cache dan refresh threshold |
 | 🔄 **Pause Refresh** | Reload stream saat lanjut setelah pause melebihi threshold |
-| 📊 **Speed Indicator** | Network speed & buffered time real-time |
+| 📊 **Speed Indicator** | Kecepatan jaringan real-time di info bar + buffered highlight di seek slider |
 | 🛠️ **Debug Overlay** | State, posisi, buffer, cache, speed, codec, URL aktif (F12/Ctrl+D) |
 | 🕵️ **Request Headers** | Custom Referer dan User-Agent |
 | 🎚️ **Quality Selector** | Pilih track video (1080p/720p/dll) |
 | 🔊 **Volume Slider** | 0–130% boost |
 | 🌑 **Fullscreen Auto-Hide** | Chrome & cursor hide setelah 3 detik idle |
 | 🪟 **Frameless Window** | Custom title bar, drag, min/max/close dengan hover state |
-| ⌨️ **Keyboard Shortcuts** | Space, arrow keys, F, H, M, Ctrl+L/Ctrl+O, F1 |
+| ⌨️ **Keyboard Shortcuts** | Space, arrow keys, F, H, M, Ctrl+L/Ctrl+O, Ctrl+,, F12/Ctrl+D, F1 |
 | 🔔 **Toast Notifications** | Feedback ringkas untuk aksi penting |
 
 ---
@@ -38,7 +38,7 @@ Pemutar streaming berbasis **HLS (.m3u8)** dengan dukungan **Referer/User-Agent 
 |----------|---------------------|
 | Sistem Operasi | Windows 10 / Windows 11 |
 | Python | Versi 3.10 atau lebih baru |
-| Library Python | `python-mpv`, `PySide6>=6.6` |
+| Library Python | `python-mpv==1.0.8`, `PySide6>=6.6` |
 | Library Eksternal | `libmpv-2.dll` (**wajib**) |
 
 📌 **Catatan:** `libmpv-2.dll` harus berada di folder utama aplikasi atau di subfolder `mpv/`.
@@ -100,6 +100,7 @@ run.bat
 | `M` | Mute / Unmute |
 | `Ctrl + L` / `Ctrl + O` | Focus URL input |
 | `F12` / `Ctrl + D` | Toggle Debug Overlay |
+| `Ctrl + ,` | Toggle config bar |
 | `F1` | Show keyboard shortcuts |
 
 > Shortcut otomatis di-block saat text input sedang fokus.
@@ -110,7 +111,7 @@ run.bat
 
 | Tombol | Fungsi |
 |--------|--------|
-| ⚙ (gear) | Toggle Settings panel |
+| ⌃ (panah atas) | Toggle config bar (collapse/expand) |
 | ⏳ (clock) | Toggle History panel |
 | – (min) | Minimize |
 | □ (max) / ⷠ (restore) | Maximize / Restore |
@@ -126,7 +127,7 @@ run.bat
 | 🔊 | Volume (klik untuk expand slider 0–130) |
 | – | Quality dropdown (Auto + detected tracks) |
 | ⛶ / ✕ | Fullscreen |
-| ⏐ | Debug overlay (juga F12) |
+| ◐ | Debug overlay (juga F12) |
 
 ---
 
@@ -136,7 +137,7 @@ run.bat
 src/app/
 ├── main_window.py            # QMainWindow orchestration
 ├── theme/
-│   ├── colors.py              # Palet warna (MPC-HC dark)
+│   ├── colors.py              # Palet warna dark theme (sumber warna utama)
 │   ├── animations.py         # Anim helper: fade, slide, expand
 │   └── styles.qss            # Global QSS (dark theme)
 ├── controllers/
@@ -154,7 +155,7 @@ src/app/
 ### Logika Inti (tidak berubah)
 - `src/player_core.py` — wrapper libmpv
 - `src/config.py` — MPV paths + palet lama (kompatibilitas mundur)
-- `src/utils.py` — JSON load/save (history + settings)
+- `src/utils.py` — JSON load/save (history + settings), tulis atomik + backup file korup, format waktu
 
 ---
 
@@ -203,10 +204,23 @@ https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
 
 ---
 
+## 🧪 Testing
+
+```bash
+python -m unittest discover tests
+```
+
+Mencakup: format waktu, roundtrip riwayat + meta (referer/UA/headers), dedup & limit 50,
+tulis JSON atomik, backup file korup, dan migrasi User-Agent lama.
+
+---
+
 ## 📝 Status UI
 
 Proyek ini sudah memakai **PySide6/Qt** sebagai UI default.
 
 - `main.py` → entrypoint resmi aplikasi Qt
 - `run.bat` → menjalankan `main.py`
-Lihat `history.json` dan `settings.json` — schema tidak berubah, jadi migrasi data otomatis.
+- Schema `history.json` & `settings.json` diperluas secara *backward-compatible*
+  (meta referer/UA/headers di riwayat; volume & geometri jendela di settings) —
+  file lama tetap terbaca otomatis.
