@@ -238,7 +238,8 @@ class PlayerController(QObject):
     def _on_property_core_idle(self, _name, value) -> None:
         if self._settle_pending:
             return
-        if value and self._state not in (PlayerState.STOPPED, PlayerState.ERROR):
+        # core-idle juga True saat pause manual — jangan dianggap LOADING/buffering.
+        if value and self._state not in (PlayerState.STOPPED, PlayerState.ERROR, PlayerState.PAUSED):
             self._set_state(PlayerState.LOADING)
         elif not value and self._state == PlayerState.LOADING:
             self._set_state(PlayerState.PLAYING)

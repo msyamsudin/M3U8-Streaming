@@ -95,5 +95,24 @@ class TestHistoryFile(unittest.TestCase):
         self.assertTrue(backups, "backup tidak dibuat untuk file korup")
 
 
+class TestPlayerStateMachine(unittest.TestCase):
+    """State machine: core-idle (True saat pause manual) tidak boleh
+    mengubah state PAUSED menjadi LOADING (indikator buffering palsu)."""
+
+    def test_core_idle_ignored_while_paused(self):
+        from src.app.controllers.player_controller import PlayerController, PlayerState
+        pc = PlayerController(None)
+        pc._set_state(PlayerState.PAUSED)
+        pc._on_property_core_idle(None, True)
+        self.assertEqual(pc.state, PlayerState.PAUSED)
+
+    def test_core_idle_sets_loading_when_not_paused(self):
+        from src.app.controllers.player_controller import PlayerController, PlayerState
+        pc = PlayerController(None)
+        pc._set_state(PlayerState.IDLE)
+        pc._on_property_core_idle(None, True)
+        self.assertEqual(pc.state, PlayerState.LOADING)
+
+
 if __name__ == "__main__":
     unittest.main()
