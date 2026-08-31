@@ -64,7 +64,10 @@ class BufferingIndicator(QWidget):
     # ------------------------------------------------------------------ public
     def show_indicator(self) -> None:
         """Tampilkan overlay: fade in lalu mulai denyut (pulse)."""
-        if self.isVisible() and self._opacity.opacity() > 0.9:
+        # Guard pakai isHidden() (flag eksplisit), bukan isVisible() — yang
+        # terakhir bergantung status window system dan tidak andal di semua
+        # platform (mis. platform offscreen).
+        if not self.isHidden() and self._opacity.opacity() > 0.9:
             return
         if self._fade_anim is not None and self._fade_anim.state() == QPropertyAnimation.State.Running:
             self._fade_anim.stop()
@@ -82,7 +85,7 @@ class BufferingIndicator(QWidget):
 
     def hide_indicator(self) -> None:
         """Sembunyikan overlay: hentikan denyut lalu fade out."""
-        if not self.isVisible():
+        if self.isHidden():
             return
         self._stop_pulse()
         if self._fade_anim is not None and self._fade_anim.state() == QPropertyAnimation.State.Running:
