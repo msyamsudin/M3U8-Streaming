@@ -77,6 +77,7 @@ class MainWindow(QMainWindow):
         self._video_container: QWidget | None = None
         self._video_placeholder: Optional[VideoPlaceholder] = None
         self._buffering_indicator: BufferingIndicator | None = None
+        self._last_active_state: str = PlayerState.IDLE
         self._debug_overlay: DebugOverlay | None = None
         self._info_bar: QWidget | None = None
         self._control_bar: ControlBar | None = None
@@ -1023,6 +1024,14 @@ class MainWindow(QMainWindow):
         self._show_toast(f"Player error: {message[:80]}", "error")
 
     def _on_player_state_changed(self, state: str) -> None:
+        # Lacak state aktif terakhir untuk membedakan load awal vs buffer/stall
+        # di tengah playback (teks indikator buffering).
+        was_active = self._last_active_state in (PlayerState.PLAYING, PlayerState.PAUSED)
+        if state in (PlayerState.PLAYING, PlayerState.PAUSED):
+            self._last_active_state = state
+        elif state in (PlayerState.STOPPED, PlayerState.ERROR, PlayerState.IDLE):
+            self._last_active_state = PlayerState.IDLE
+
         object_name = {
             PlayerState.PLAYING: "statusPlaying",
             PlayerState.PAUSED: "statusPaused",
@@ -1057,6 +1066,8 @@ class MainWindow(QMainWindow):
         # Buffering indicator: tampil saat menunggu data (load awal / buffer/stall)
         if self._buffering_indicator is not None:
             if state == PlayerState.LOADING:
+                message = "Buffering\u2026" if was_active else "Loading\u2026"
+                self._buffering_indicator.set_message(message)
                 self._buffering_indicator.show_indicator()
             else:
                 self._buffering_indicator.hide_indicator()

@@ -62,6 +62,12 @@ class BufferingIndicator(QWidget):
         self._pulse: Optional[QPropertyAnimation] = None
 
     # ------------------------------------------------------------------ public
+    def set_message(self, text: str) -> None:
+        """Ganti teks overlay (mis. 'Loading…' saat load awal, 'Buffering…' saat stall)."""
+        if self._text.text() != text:
+            self._text.setText(text)
+            self._center()
+
     def show_indicator(self) -> None:
         """Tampilkan overlay: fade in lalu mulai denyut (pulse)."""
         # Guard pakai isHidden() (flag eksplisit), bukan isVisible() — yang
