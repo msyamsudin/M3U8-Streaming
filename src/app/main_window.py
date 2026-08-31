@@ -1,6 +1,7 @@
 from pathlib import Path
 import time
 from typing import Optional
+from urllib.parse import urlparse
 
 from PySide6.QtCore import QEvent, QPropertyAnimation, QTimer, Qt
 from PySide6.QtGui import QCursor, QFont
@@ -92,6 +93,7 @@ class MainWindow(QMainWindow):
         self._pending_headers: dict = {}
         self._pending_referer: str = ""
         self._pending_cache: dict = dict(CACHE_DEFAULTS)
+        self._pending_volume: Optional[int] = None
         self._current_url: str = ""
         self._current_headers: dict = {}
         self._current_user_agent: str = ""
@@ -175,12 +177,28 @@ class MainWindow(QMainWindow):
             "back": int(cache.get("back", CACHE_DEFAULTS["back"])),
             "pause_refresh": int(cache.get("pause_refresh", CACHE_DEFAULTS["pause_refresh"])),
         }
+        self._pending_volume = data.get("volume")
+        geom = data.get("window_geometry") or {}
+        x, y, w, h = geom.get("x"), geom.get("y"), geom.get("w"), geom.get("h")
+        if all(v is not None for v in (x, y, w, h)):
+            try:
+                self.setGeometry(int(x), int(y), int(w), int(h))
+            except Exception:
+                pass
 
     def _persist_settings(self) -> None:
+        geo = self.geometry()
         data = {
             "user_agent": self._pending_user_agent,
             "referer": self._pending_referer,
             "headers": self._pending_headers,
+            "volume": self._player.volume if self._player.is_initialized else None,
+            "window_geometry": {
+                "x": geo.x(),
+                "y": geo.y(),
+                "w": geo.width(),
+                "h": geo.height(),
+            },
             "cache": {
                 "forward": self._cache_forward.value(),
                 "back": self._cache_back.value(),
@@ -310,6 +328,7 @@ class MainWindow(QMainWindow):
 
     def _wire_config_form(self) -> None:
         self._load_btn.clicked.connect(self._on_load_url)
+        self._url_input.returnPressed.connect(self._on_load_url)
         self._referer_input.editingFinished.connect(self._on_referer_changed)
         self._ua_combo.currentIndexChanged.connect(self._on_ua_combo_changed)
         self._ua_custom_input.editingFinished.connect(self._on_ua_custom_changed)
@@ -981,6 +1000,9 @@ class MainWindow(QMainWindow):
 
     def _on_player_initialized(self) -> None:
         self._log_status("Player initialized")
+        # Terapkan volume tersimpan setelah player siap
+        if getattr(self, "_pending_volume", None) is not None:
+            self._player.set_volume(int(self._pending_volume))
 
     def _on_player_error(self, message: str) -> None:
         self._log_status(f"Error: {message}")
@@ -1046,6 +1068,9 @@ class MainWindow(QMainWindow):
         if not url:
             self._show_toast("Please enter a stream URL", "warning")
             return
+        if urlparse(url).scheme not in ("http", "https"):
+            self._show_toast("Only http/https URLs are supported", "warning")
+            return
         self._show_toast(f"Loading: {url[:60]}", "info")
         self._on_referer_changed()
         ua = self._pending_user_agent or ""
@@ -1099,14 +1124,19 @@ class MainWindow(QMainWindow):
             return
         self._resume_prompted_for_url = self._current_url
         self._player.toggle_pause()
-        answer = QMessageBox.question(
-            self,
-            "Resume Playback",
-            f"Resume from {format_time(pos)}?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes,
-        )
-        if answer == QMessageBox.StandardButton.Yes:
+
+        # Dialog non-modal: tidak memblokir UI; jawaban diproses via callback.
+        box = QMessageBox(self)
+        box.setWindowTitle("Resume Playback")
+        box.setText(f"Resume from {format_time(pos)}?")
+        resume_btn = box.addButton("Resume", QMessageBox.YesRole)
+        box.addButton("Start Over", QMessageBox.NoRole)
+        box.setModal(False)
+        box.buttonClicked.connect(lambda btn: self._on_resume_answer(btn, resume_btn, pos))
+        box.show()
+
+    def _on_resume_answer(self, btn, resume_btn, pos: float) -> None:
+        if btn is resume_btn:
             self._retry_seek(pos)
         self._player.toggle_pause()
 

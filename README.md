@@ -191,6 +191,18 @@ https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
 
 ---
 
+## 🔒 Keamanan Data
+
+> ⚠️ **`history.json` menyimpan URL stream lengkap, termasuk token akses signed**
+> (bisa berumur panjang) dalam teks polos. File ini **tidak** di-upload ke git
+> (sudah di `.gitignore`), tapi jangan dibagikan atau di-backup ke tempat publik.
+>
+> `settings.json` berisi konfigurasi lokal (referer, user-agent, volume, geometri
+> jendela) dan saat ini ikut ter-track di repo. Jika ingin menjaga privasi
+> konfigurasi per-mesin, tambahkan `settings.json` ke `.gitignore`.
+
+---
+
 ## 📝 Status UI
 
 Proyek ini sudah memakai **PySide6/Qt** sebagai UI default.

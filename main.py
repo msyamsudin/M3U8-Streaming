@@ -75,7 +75,6 @@ def _build_app_icon() -> QIcon:
 
 
 def main() -> int:
-    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )

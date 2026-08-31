@@ -84,6 +84,23 @@ class SeekSlider(QSlider):
             return
         super().mouseReleaseEvent(event)
 
+    def keyPressEvent(self, event) -> None:
+        # Izinkan kontrol keyboard: QSlider mengubah value, lalu kita emit seek.
+        # QSlider meng-konsumsi tombol panah, jadi shortcut global tidak dobel.
+        super().keyPressEvent(event)
+        if event.key() in (
+            Qt.Key_Left,
+            Qt.Key_Right,
+            Qt.Key_PageUp,
+            Qt.Key_PageDown,
+            Qt.Key_Home,
+            Qt.Key_End,
+        ):
+            fraction = (self.value() - self.minimum()) / max(
+                1, (self.maximum() - self.minimum())
+            )
+            self.user_seek.emit(fraction)
+
     # ------------------------------------------------------------------ paint
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
