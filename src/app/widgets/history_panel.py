@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtCore import QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QColor, QFont, QPainter
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -134,6 +134,7 @@ class HistoryPanel(QWidget):
     panel_close_requested = Signal()
 
     PANEL_WIDTH = 320
+    FLUSH_DEBOUNCE_MS = 30_000  # tulis disk maks. 1x/30 detik saat streaming
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -142,6 +143,8 @@ class HistoryPanel(QWidget):
         self.setFixedWidth(self.PANEL_WIDTH)
         self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
         self._history: List[dict] = []
+        self._items: dict = {}  # url -> QListWidgetItem, untuk update baris tunggal
+        self._flush_timer: Optional[QTimer] = None
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(12, 12, 12, 12)
@@ -187,6 +190,7 @@ class HistoryPanel(QWidget):
 
     # ------------------------------------------------------------------ public
     def refresh(self) -> None:
+        self.flush_pending()  # pastikan perubahan yang belum ter-flush tidak hilang
         self._history = load_history() or []
         self._populate()
 
@@ -195,20 +199,53 @@ class HistoryPanel(QWidget):
         self.refresh()
 
     def update_progress(self, url: str, position: float, duration: float = 0) -> None:
+        """Update posisi terakhir tanpa menulis disk / rebuild list setiap kali.
+
+        Hanya baris item yang bersangkutan yang di-update; penulisan ke disk
+        di-debounce dan dilakukan oleh :meth:`flush_pending`.
+        """
         if not url:
             return
-        for entry in self._history:
-            if entry.get("url") == url:
-                entry["last_position"] = position
-                if duration > 0:
-                    entry["duration"] = duration
-                entry["timestamp"] = datetime.now().isoformat()
-                break
-        else:
+        entry = self._find_entry(url)
+        if entry is None:
             save_history(url)
             self._history = load_history() or []
-        write_history(self._history)
-        self._populate()
+            self._populate()
+            entry = self._find_entry(url)
+        if entry is None:
+            return
+        entry["last_position"] = position
+        if duration > 0:
+            entry["duration"] = duration
+        entry["timestamp"] = datetime.now().isoformat()
+
+        item = self._items.get(url)
+        if item is not None:
+            item.setData(Qt.UserRole + 3, entry.get("last_position", 0) or 0)
+            item.setData(Qt.UserRole + 4, entry.get("duration", 0) or 0)
+            # repaint hanya baris item tersebut (bukan seluruh list)
+            self._list.viewport().update(self._list.visualItemRect(item))
+        self._schedule_disk_flush()
+
+    def _find_entry(self, url: str) -> Optional[dict]:
+        for candidate in self._history:
+            if candidate.get("url") == url:
+                return candidate
+        return None
+
+    def _schedule_disk_flush(self) -> None:
+        if self._flush_timer is None:
+            self._flush_timer = QTimer(self)
+            self._flush_timer.setSingleShot(True)
+            self._flush_timer.timeout.connect(self.flush_pending)
+        self._flush_timer.start(self.FLUSH_DEBOUNCE_MS)
+
+    def flush_pending(self) -> None:
+        """Tulis riwayat ke disk bila ada perubahan yang belum ter-flush."""
+        if self._flush_timer is not None:
+            self._flush_timer.stop()
+        if self._history:
+            write_history(self._history)
 
     def get_history(self) -> List[dict]:
         return list(self._history)
@@ -216,6 +253,7 @@ class HistoryPanel(QWidget):
     # ------------------------------------------------------------------ internal
     def _populate(self) -> None:
         self._list.clear()
+        self._items.clear()
         for entry in self._history:
             item = QListWidgetItem()
             ts = entry.get("timestamp", "")
@@ -232,6 +270,7 @@ class HistoryPanel(QWidget):
             item.setData(Qt.UserRole + 3, entry.get("last_position", 0) or 0)
             item.setData(Qt.UserRole + 4, entry.get("duration", 0) or 0)
             item.setData(Qt.UserRole + 5, entry)
+            self._items[entry.get("url", "")] = item
             self._list.addItem(item)
 
         if self._list.count() == 0:

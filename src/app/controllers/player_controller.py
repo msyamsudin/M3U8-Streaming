@@ -101,6 +101,13 @@ class PlayerController(QObject):
     def _poll(self) -> None:
         if not self.is_initialized:
             return
+        # Jangan lakukan pembacaan properti mpv (boundary C) saat player tidak
+        # aktif. Early-return dipilih daripada stop/start QTimer karena callback
+        # observer mpv berjalan di thread event python-mpv, sedangkan QTimer
+        # memiliki thread affinity GUI — menghentikan/menyalakan dari thread
+        # lain tidak aman.
+        if self._state in (PlayerState.IDLE, PlayerState.STOPPED, PlayerState.ERROR):
+            return
 
         pos = self._player.get_time_pos()
         if pos is not None:

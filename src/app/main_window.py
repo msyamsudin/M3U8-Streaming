@@ -36,7 +36,6 @@ from src.utils import (
     save_history,
     load_settings,
     save_settings,
-    update_history_progress,
 )
 from src.config import USER_AGENTS
 
@@ -933,7 +932,7 @@ class MainWindow(QMainWindow):
             self._debug_overlay.update_stats({"volume": f"{volume}"})
 
     def _on_player_network_speed(self, bps: float) -> None:
-        if self._debug_overlay is None:
+        if self._debug_overlay is None or not self._debug_visible:
             return
         if bps >= 1024 * 1024:
             text = f"{bps / (1024 * 1024):.2f} MB/s"
@@ -944,7 +943,7 @@ class MainWindow(QMainWindow):
         self._debug_overlay.update_stats({"speed": text})
 
     def _on_player_cache_state(self, cache_state: object) -> None:
-        if not isinstance(cache_state, dict):
+        if not isinstance(cache_state, dict) or not self._debug_visible:
             return
         self._last_cache_state = dict(cache_state)
         self._update_debug_cache()
@@ -1101,7 +1100,6 @@ class MainWindow(QMainWindow):
             return
         self._last_progress_save_second = second
         try:
-            update_history_progress(self._current_url, pos)
             self._history_panel.update_progress(self._current_url, pos, duration)
         except Exception:
             pass
@@ -1214,6 +1212,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:
         self._persist_settings()
+        self._history_panel.flush_pending()  # simpan posisi terakhir yang masih di-debounce
         self._player.terminate()
         super().closeEvent(event)
 
