@@ -169,7 +169,7 @@ src/app/
 | Toast in/out | Slide vertical + fade 250ms |
 | Fullscreen auto-hide | Title + control bar hide setelah idle |
 | Mouse activity | Reset 3-detik idle timer |
-| Buffering indicator | Overlay "Buffering…" fade in/out + pulsa saat stream menunggu data (load/buffer) |
+| Buffering indicator | Overlay "Loading…/Buffering…" fade in/out + spinner berputar + pulsa saat stream menunggu data |
 
 ---
 

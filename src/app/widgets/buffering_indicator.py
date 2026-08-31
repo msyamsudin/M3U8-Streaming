@@ -1,18 +1,58 @@
 from typing import Optional
 
-from PySide6.QtCore import QPropertyAnimation, Qt
+from PySide6.QtCore import QPropertyAnimation, QRectF, Qt, QVariantAnimation
+from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import QGraphicsOpacityEffect, QHBoxLayout, QLabel, QWidget
 
 from src.app.theme.animations import Anim
+
+
+class _Spinner(QWidget):
+    """Lingkaran arc yang berputar — indikator loading/buffering standar."""
+
+    SPIN_DURATION = 900  # ms per putaran
+    ARC_SPAN = 270       # derajat busur yang digambar
+
+    def __init__(self, size: int = 22, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.setFixedSize(size, size)
+        self._angle = 0
+        self._anim = QVariantAnimation(self)
+        self._anim.setStartValue(0)
+        self._anim.setEndValue(360)
+        self._anim.setDuration(self.SPIN_DURATION)
+        self._anim.setLoopCount(-1)
+        self._anim.valueChanged.connect(self._on_angle_changed)
+
+    def start(self) -> None:
+        self._anim.start()
+
+    def stop(self) -> None:
+        self._anim.stop()
+
+    def _on_angle_changed(self, value) -> None:
+        self._angle = float(value)
+        self.update()
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        pen = QPen(QColor("#3b82f6"), max(2, self.width() // 8), Qt.SolidLine, Qt.RoundCap)
+        painter.setPen(pen)
+        margin = pen.widthF()
+        rect = QRectF(margin, margin, self.width() - 2 * margin, self.height() - 2 * margin)
+        start = int(-self._angle * 16)  # negatif = searah jarum jam
+        span = int(self.ARC_SPAN * 16)
+        painter.drawArc(rect, start, span)
 
 
 class BufferingIndicator(QWidget):
     """Overlay "Buffering…" yang muncul saat stream menunggu data.
 
     Ditampilkan saat player dalam state ``LOADING`` (load awal maupun buffer/
-    stall di tengah playback): fade in lalu berdenyut (pulse) halus, kemudian
-    fade out saat playback berlanjut. Transparan terhadap mouse agar klik tetap
-    sampai ke area video.
+    stall di tengah playback): spinner berputar + fade in lalu berdenyut
+    (pulse) halus, kemudian fade out saat playback berlanjut. Transparan
+    terhadap mouse agar klik tetap sampai ke area video.
     """
 
     PULSE_MIN = 0.4
@@ -30,12 +70,8 @@ class BufferingIndicator(QWidget):
         layout.setContentsMargins(18, 10, 18, 10)
         layout.setSpacing(10)
 
-        self._icon = QLabel("\u27F3")  # ⟳
-        self._icon.setAlignment(Qt.AlignCenter)
-        self._icon.setStyleSheet(
-            "color: #3b82f6; background: transparent; border: none; font-size: 16pt;"
-        )
-        layout.addWidget(self._icon)
+        self._spinner = _Spinner(size=22)
+        layout.addWidget(self._spinner)
 
         self._text = QLabel("Buffering\u2026")
         self._text.setStyleSheet(
@@ -69,7 +105,7 @@ class BufferingIndicator(QWidget):
             self._center()
 
     def show_indicator(self) -> None:
-        """Tampilkan overlay: fade in lalu mulai denyut (pulse)."""
+        """Tampilkan overlay: spinner berputar, fade in, lalu denyut (pulse)."""
         # Guard pakai isHidden() (flag eksplisit), bukan isVisible() — yang
         # terakhir bergantung status window system dan tidak andal di semua
         # platform (mis. platform offscreen).
@@ -79,6 +115,7 @@ class BufferingIndicator(QWidget):
             self._fade_anim.stop()
         self._stop_pulse()
         self._opacity.setOpacity(0.0)
+        self._spinner.start()
         self.setVisible(True)
         self._center()
         self.raise_()
@@ -90,9 +127,10 @@ class BufferingIndicator(QWidget):
         self._fade_anim.start()
 
     def hide_indicator(self) -> None:
-        """Sembunyikan overlay: hentikan denyut lalu fade out."""
+        """Sembunyikan overlay: hentikan spinner & denyut lalu fade out."""
         if self.isHidden():
             return
+        self._spinner.stop()
         self._stop_pulse()
         if self._fade_anim is not None and self._fade_anim.state() == QPropertyAnimation.State.Running:
             self._fade_anim.stop()
