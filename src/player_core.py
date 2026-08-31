@@ -106,9 +106,9 @@ class MpvPlayer:
         return self.mpv.track_list
 
     def set_video_track(self, track_id):
-        """Set video track by ID."""
+        """Set video track by ID. ``None`` (Auto) returns to automatic selection."""
         if self.mpv:
-            self.mpv.vid = track_id
+            self.mpv.vid = "auto" if track_id is None else track_id
     
     def get_demuxer_cache_state(self):
         """Get demuxer cache state including network speed."""

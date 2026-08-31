@@ -1,13 +1,99 @@
 #!/usr/bin/env python3
-import tkinter as tk
-from src.app_gui import M3U8StreamingPlayer
+import sys
+from pathlib import Path
 
-def main():
-    
-    root = tk.Tk()
-    app = M3U8StreamingPlayer(root)
-    root.protocol("WM_DELETE_WINDOW", app.on_closing)
-    root.mainloop()
+from PySide6.QtCore import QPointF, QRectF, Qt
+from PySide6.QtGui import QBrush, QColor, QIcon, QLinearGradient, QPainter, QPalette, QPixmap
+from PySide6.QtWidgets import QApplication
+
+from src.app.main_window import MainWindow
+
+
+def _apply_dark_palette(app: QApplication) -> None:
+    app.setStyle("Fusion")
+
+    palette = QPalette()
+    palette.setColor(QPalette.Window, QColor("#0f0f0f"))
+    palette.setColor(QPalette.WindowText, QColor("#ffffff"))
+    palette.setColor(QPalette.Base, QColor("#1a1a1a"))
+    palette.setColor(QPalette.AlternateBase, QColor("#0f0f0f"))
+    palette.setColor(QPalette.ToolTipBase, QColor("#1a1a1a"))
+    palette.setColor(QPalette.ToolTipText, QColor("#ffffff"))
+    palette.setColor(QPalette.Text, QColor("#ffffff"))
+    palette.setColor(QPalette.Button, QColor("#2d2d2d"))
+    palette.setColor(QPalette.ButtonText, QColor("#ffffff"))
+    palette.setColor(QPalette.BrightText, QColor("#ff4444"))
+    palette.setColor(QPalette.Link, QColor("#007ACC"))
+    palette.setColor(QPalette.Highlight, QColor("#007ACC"))
+    palette.setColor(QPalette.HighlightedText, QColor("#ffffff"))
+    palette.setColor(QPalette.Disabled, QPalette.Text, QColor("#666666"))
+    palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor("#666666"))
+    app.setPalette(palette)
+
+
+def _load_stylesheet(app: QApplication) -> None:
+    qss_path = Path(MainWindow.stylesheet_path())
+    if not qss_path.exists():
+        print(f"[warn] stylesheet not found: {qss_path}", file=sys.stderr)
+        return
+    app.setStyleSheet(qss_path.read_text(encoding="utf-8"))
+
+
+def _build_app_icon() -> QIcon:
+    icon = QIcon()
+    for size in (16, 24, 32, 48, 64, 128, 256):
+        pix = QPixmap(size, size)
+        pix.fill(Qt.transparent)
+        painter = QPainter(pix)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+
+        gradient = QLinearGradient(0, 0, 0, size)
+        gradient.setColorAt(0.0, QColor("#0098FF"))
+        gradient.setColorAt(1.0, QColor("#005FA3"))
+        painter.setBrush(QBrush(gradient))
+        painter.setPen(Qt.NoPen)
+        radius = max(2, int(size * 0.18))
+        painter.drawRoundedRect(QRectF(0, 0, size, size), radius, radius)
+
+        painter.setBrush(QColor("#ffffff"))
+        cx = size * 0.42
+        cy = size * 0.5
+        w = size * 0.36
+        h = size * 0.42
+        from PySide6.QtGui import QPolygonF
+
+        poly = QPolygonF([
+            QPointF(cx, cy - h / 2),
+            QPointF(cx + w, cy),
+            QPointF(cx, cy + h / 2),
+        ])
+        painter.drawPolygon(poly)
+        painter.end()
+        icon.addPixmap(pix)
+    return icon
+
+
+def main() -> int:
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+    QApplication.setHighDpiScaleFactorRoundingPolicy(
+        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+    )
+
+    app = QApplication(sys.argv)
+    app.setApplicationName("M3U8 Player")
+    app.setOrganizationName("M3U8-Streaming")
+    app.setApplicationDisplayName("M3U8 Player")
+    app.setWindowIcon(_build_app_icon())
+
+    _apply_dark_palette(app)
+    _load_stylesheet(app)
+
+    window = MainWindow()
+    window.setWindowIcon(app.windowIcon())
+    window.show()
+
+    return app.exec()
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

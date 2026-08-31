@@ -30,3 +30,6 @@ mpv/
 # Documentation Artifacts
 implementation_plan.md
 walkthrough.md
+
+# Local review/planning docs (not for GitHub)
+docs/

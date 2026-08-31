@@ -80,8 +80,12 @@ def load_history():
     except:
         return []
 
-def save_history(url, name=None):
-    """Save a URL to history, avoiding duplicates at the top."""
+def save_history(url, name=None, meta=None):
+    """Save a URL to history, avoiding duplicates at the top.
+
+    ``meta`` (optional) carries per-entry request metadata (referer,
+    user_agent, headers) so it can be restored later.
+    """
     history = load_history()
     
     # Check for existing position
@@ -98,6 +102,10 @@ def save_history(url, name=None):
         "timestamp": datetime.now().isoformat(),
         "last_position": last_pos
     }
+    if meta:
+        entry["referer"] = meta.get("referer", "")
+        entry["user_agent"] = meta.get("user_agent", "")
+        entry["headers"] = meta.get("headers", {})
     
     # Remove existing entry with same URL if exists
     history = [h for h in history if h['url'] != url]

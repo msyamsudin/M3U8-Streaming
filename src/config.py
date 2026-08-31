@@ -1,13 +1,12 @@
 import os
-import sys
 
 # -------------------------------------------------
 #  MPV detection & PATH setup
 # -------------------------------------------------
-BASE_DIR = getattr(sys, '_MEIPASS', os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 MPV_PATHS = [
-    BASE_DIR,                                # folder EXE (PyInstaller) atau script asli
+    BASE_DIR,
     os.path.join(BASE_DIR, "mpv"),           # jika pengguna menaruh DLL di subfolder "mpv"
     r"C:\mpv",
     r"C:\Program Files\mpv",
