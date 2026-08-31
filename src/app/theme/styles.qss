@@ -54,7 +54,8 @@ QPushButton#titleBarButton#closeButton:hover  { background-color: #ef4444; color
 QPushButton#titleBarButton#closeButton:pressed{ background-color: #dc2626; color: #ffffff; }
 
 QPushButton#titleBarButton#settingsButton[active="true"],
-QPushButton#titleBarButton#historyButton[active="true"] {
+QPushButton#titleBarButton#historyButton[active="true"],
+QPushButton#titleBarButton#collapseConfigButton[active="true"] {
     background-color: #1d4ed8;
     color: #ffffff;
 }

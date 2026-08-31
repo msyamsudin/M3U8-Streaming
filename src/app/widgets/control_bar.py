@@ -76,6 +76,7 @@ class ControlBar(QWidget):
         self._is_fullscreen = False
         self._is_recording = False
         self._volume_visible = False
+        self._volume_anim: Optional[QPropertyAnimation] = None
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(16, 8, 16, 8)
@@ -119,7 +120,7 @@ class ControlBar(QWidget):
 
         self._volume_container = QWidget()
         self._volume_container.setObjectName("volumeContainer")
-        self._volume_container.setFixedWidth(38)
+        self._volume_container.setMinimumWidth(38)  # bisa melebar saat slider volume dibuka
         vol_layout = QHBoxLayout(self._volume_container)
         vol_layout.setContentsMargins(0, 0, 0, 0)
         vol_layout.setSpacing(0)
@@ -130,7 +131,6 @@ class ControlBar(QWidget):
         self._volume_slider.setObjectName("volumeSlider")
         self._volume_slider.setRange(0, 130)
         self._volume_slider.setValue(100)
-        self._volume_slider.setFixedWidth(0)
         self._volume_slider.setVisible(False)
         self._volume_slider.valueChanged.connect(self._on_volume_slider_changed)
         vol_layout.addWidget(self._volume_slider)
@@ -236,17 +236,26 @@ class ControlBar(QWidget):
 
     def _on_volume_btn_clicked(self) -> None:
         self._volume_visible = not self._volume_visible
-        target_w = 90 if self._volume_visible else 0
         if self._volume_visible:
             self._volume_slider.setVisible(True)
-        Anim.expand_horizontal(self._volume_container, target_w, duration=Anim.DURATION_NORMAL)
+            # Tahan lebar di kondisi tertutup dulu: setVisible memicu relayout
+            # sinkron, jadi tanpa ini container langsung melebar dan animasi
+            # buka tidak akan terlihat.
+            self._volume_container.setMaximumWidth(38)
+        target_w = 130 if self._volume_visible else 38
+        if self._volume_anim is not None:
+            self._volume_anim.stop()
+        anim = QPropertyAnimation(self._volume_container, b"maximumWidth")
+        anim.setDuration(Anim.DURATION_NORMAL)
+        anim.setStartValue(38 if self._volume_visible else self._volume_container.width())
+        anim.setEndValue(target_w)
+        anim.setEasingCurve(Anim.EASE_OUT)
         if not self._volume_visible:
             def _hide():
                 self._volume_slider.setVisible(False)
-            QPropertyAnimation(
-                self._volume_container, b"maximumWidth"
-            )  # no-op to keep static analysis happy
-            self._volume_slider.setVisible(False)
+            anim.finished.connect(_hide)
+        anim.start()
+        self._volume_anim = anim
 
     def _on_volume_slider_changed(self, value: int) -> None:
         self._update_volume_icon(value)

@@ -757,6 +757,7 @@ class MainWindow(QMainWindow):
     def _setup_central_widget(self) -> None:
         central = QWidget()
         central.setObjectName("rootWidget")
+        central.setAttribute(Qt.WA_StyledBackground, True)  # agar background QSS dirender
         self.setCentralWidget(central)
 
         root = QVBoxLayout(central)
@@ -818,6 +819,7 @@ class MainWindow(QMainWindow):
     def _build_video_area(self) -> QWidget:
         container = QWidget()
         container.setObjectName("videoContainer")
+        container.setAttribute(Qt.WA_StyledBackground, True)  # agar background QSS dirender
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -849,6 +851,7 @@ class MainWindow(QMainWindow):
         bar = QWidget()
         self._info_bar = bar
         bar.setObjectName("infoBar")
+        bar.setAttribute(Qt.WA_StyledBackground, True)  # agar background QSS dirender
         layout = QHBoxLayout(bar)
         layout.setContentsMargins(16, 6, 16, 6)
         layout.setSpacing(12)
@@ -1251,6 +1254,7 @@ class ConfigBar(QWidget):
 
         card = QWidget()
         card.setObjectName("configBarCard")
+        card.setAttribute(Qt.WA_StyledBackground, True)  # agar background QSS dirender
         outer.addWidget(card)
 
         grid = QGridLayout(card)
