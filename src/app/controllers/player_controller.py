@@ -45,6 +45,8 @@ class PlayerController(QObject):
         self._poll_timer: Optional[QTimer] = None
         self._init_pending: bool = False
         self._surface_wid: Optional[int] = None
+        self._settle_pending: bool = False
+        self._settle_timer: Optional[QTimer] = None
 
     # ------------------------------------------------------------------ init
     @property
@@ -80,6 +82,21 @@ class PlayerController(QObject):
         mpv_obj.observe_property("duration", self._on_property_duration)
         mpv_obj.observe_property("volume", self._on_property_volume)
         mpv_obj.observe_property("track-list", self._on_property_track_list)
+
+        # Callback awal (nilai properti saat registrasi) datang dari thread event
+        # mpv dengan urutan yang tidak dijamin. Abaikan perubahan STATE selama
+        # jendela settle agar state machine tidak ter-flip acak tepat setelah
+        # init (mis. LOADING -> PLAYING -> LOADING yang membuat indikator
+        # buffering berkedip).
+        self._settle_pending = True
+        self._settle_timer = QTimer(self)
+        self._settle_timer.setSingleShot(True)
+        self._settle_timer.setInterval(500)
+        self._settle_timer.timeout.connect(self._on_settle_done)
+        self._settle_timer.start()
+
+    def _on_settle_done(self) -> None:
+        self._settle_pending = False
 
     # ------------------------------------------------------------------ polling
     def _start_polling(self) -> None:
@@ -164,6 +181,9 @@ class PlayerController(QObject):
 
     def terminate(self) -> None:
         self._stop_polling()
+        if self._settle_timer is not None:
+            self._settle_timer.stop()
+            self._settle_timer = None
         if self._player is not None:
             try:
                 self._player.terminate()
@@ -211,22 +231,24 @@ class PlayerController(QObject):
             if self._state == PlayerState.LOADING:
                 self._set_state(PlayerState.PLAYING)
     def _on_property_pause(self, _name, value) -> None:
-        if value is None:
+        if value is None or self._settle_pending:
             return
         self._set_state(PlayerState.PAUSED if value else PlayerState.PLAYING)
 
     def _on_property_core_idle(self, _name, value) -> None:
+        if self._settle_pending:
+            return
         if value and self._state not in (PlayerState.STOPPED, PlayerState.ERROR):
             self._set_state(PlayerState.LOADING)
         elif not value and self._state == PlayerState.LOADING:
             self._set_state(PlayerState.PLAYING)
 
     def _on_property_paused_for_cache(self, _name, value) -> None:
-        if value and self._state not in (PlayerState.PAUSED, PlayerState.STOPPED):
+        if value and not self._settle_pending and self._state not in (PlayerState.PAUSED, PlayerState.STOPPED):
             self._set_state(PlayerState.LOADING)
 
     def _on_property_eof_reached(self, _name, value) -> None:
-        if value and self._state != PlayerState.ERROR:
+        if value and not self._settle_pending and self._state != PlayerState.ERROR:
             self._set_state(PlayerState.STOPPED)
 
     def _on_property_duration(self, _name, value) -> None:

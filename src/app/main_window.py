@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 
 from src.app.controllers.player_controller import PlayerController, PlayerState
 from src.app.theme.animations import Anim
+from src.app.widgets.buffering_indicator import BufferingIndicator
 from src.app.widgets.control_bar import ControlBar
 from src.app.widgets.custom_title_bar import CustomTitleBar
 from src.app.widgets.debug_overlay import DebugOverlay
@@ -75,6 +76,7 @@ class MainWindow(QMainWindow):
         self._video_surface: VideoSurface | None = None
         self._video_container: QWidget | None = None
         self._video_placeholder: Optional[VideoPlaceholder] = None
+        self._buffering_indicator: BufferingIndicator | None = None
         self._debug_overlay: DebugOverlay | None = None
         self._info_bar: QWidget | None = None
         self._control_bar: ControlBar | None = None
@@ -837,6 +839,8 @@ class MainWindow(QMainWindow):
         container.installEventFilter(self)
         self._debug_overlay = DebugOverlay(container)
         self._debug_overlay.setVisible(False)
+        self._buffering_indicator = BufferingIndicator(container)
+        self._buffering_indicator.setVisible(False)
         return container
 
     def _resize_video_overlays(self) -> None:
@@ -847,6 +851,8 @@ class MainWindow(QMainWindow):
             self._video_placeholder.setGeometry(rect)
         if self._debug_overlay is not None:
             self._debug_overlay._reposition()
+        if self._buffering_indicator is not None:
+            self._buffering_indicator._center()
         self._position_fullscreen_controls()
 
     def _build_info_bar(self) -> QWidget:
@@ -1047,6 +1053,13 @@ class MainWindow(QMainWindow):
                 self._video_placeholder.hide_animated()
             elif state in (PlayerState.STOPPED, PlayerState.ERROR, PlayerState.IDLE):
                 self._video_placeholder.show_animated()
+
+        # Buffering indicator: tampil saat menunggu data (load awal / buffer/stall)
+        if self._buffering_indicator is not None:
+            if state == PlayerState.LOADING:
+                self._buffering_indicator.show_indicator()
+            else:
+                self._buffering_indicator.hide_indicator()
 
     def _on_player_position(self, pos: float) -> None:
         duration = self._player.duration

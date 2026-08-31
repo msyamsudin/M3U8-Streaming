@@ -19,6 +19,7 @@ dist/
 # Project Specific
 downloads/
 history.json
+settings.json
 *.log
 
 # MPV DLLs (Large files, should be downloaded separately)
