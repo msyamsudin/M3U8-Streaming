@@ -9,14 +9,13 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QSlider,
-    QSpacerItem,
-    QStackedWidget,
     QToolButton,
     QWidget,
 )
 
 from src.app.theme.animations import Anim
 from src.app.widgets.seek_slider import SeekSlider
+from src.utils import format_clock
 
 
 class _IconButton(QToolButton):
@@ -47,17 +46,14 @@ class ControlBar(QWidget):
     volume_requested = Signal(int)
     quality_selected = Signal(object)
     fullscreen_toggle_requested = Signal()
-    record_toggle_requested = Signal()
     debug_toggle_requested = Signal()
     previous_chapter_clicked = Signal()
     next_chapter_clicked = Signal()
 
     PLAY_GLYPH = "\u25B6"
     PAUSE_GLYPH = "\u23F8"
-    STOP_GLYPH = "\u25A0"
     FULLSCREEN_GLYPH = "\u26F6"
     EXIT_FULLSCREEN_GLYPH = "\u2715"
-    RECORD_GLYPH = "\u25CF"
     VOLUME_GLYPH = "\u266B"
     VOLUME_MID_GLYPH = "\u266C"
     MUTE_GLYPH = "\u2715"
@@ -161,8 +157,8 @@ class ControlBar(QWidget):
         self._play_btn.setToolTip("Pause" if is_playing else "Play")
 
     def set_position(self, current: float, duration: float) -> None:
-        self._position_label.setText(self._format_time(current))
-        self._duration_label.setText(self._format_time(duration))
+        self._position_label.setText(format_clock(current))
+        self._duration_label.setText(format_clock(duration))
         if duration > 0 and not self._seek_slider.is_seeking():
             fraction = max(0.0, min(1.0, current / duration))
             self._seek_slider.setValue(int(fraction * self._seek_slider.maximum()))
@@ -194,10 +190,6 @@ class ControlBar(QWidget):
         self._debug_btn.style().unpolish(self._debug_btn)
         self._debug_btn.style().polish(self._debug_btn)
 
-    def set_recording(self, is_recording: bool) -> None:
-        # Recording is not exposed in the modern control bar layout.
-        pass
-
     def set_track_list(self, tracks: list) -> None:
         previous_data = self._quality_combo.currentData()
         self._quality_combo.blockSignals(True)
@@ -216,13 +208,6 @@ class ControlBar(QWidget):
             if idx >= 0:
                 self._quality_combo.setCurrentIndex(idx)
         self._quality_combo.blockSignals(False)
-
-    def set_enabled_controls(self, enabled: bool) -> None:
-        self._play_btn.setEnabled(enabled)
-        self._seek_slider.setEnabled(enabled)
-        self._quality_combo.setEnabled(enabled)
-        self._volume_btn.setEnabled(enabled)
-        self._fullscreen_btn.setEnabled(enabled)
 
     # ------------------------------------------------------------------ slots
     def _on_play_clicked(self) -> None:
@@ -285,13 +270,3 @@ class ControlBar(QWidget):
         if codec:
             return f"{res} ({codec})"
         return res
-
-    @staticmethod
-    def _format_time(seconds: float) -> str:
-        if seconds is None or seconds < 0:
-            seconds = 0
-        m, s = divmod(int(seconds), 60)
-        h, m = divmod(m, 60)
-        if h:
-            return f"{h:02d}:{m:02d}:{s:02d}"
-        return f"{m:02d}:{s:02d}"

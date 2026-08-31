@@ -15,6 +15,8 @@ MPV_PATHS = [
 
 # -------------------------------------------------
 #  MPC-HC Style Colors (Dark Theme)
+#  DEPRECATED: gunakan src.app.theme.colors.Colors.
+#  Dipertahankan hanya untuk kompatibilitas mundur.
 # -------------------------------------------------
 COLORS = {
     'bg': '#0f0f0f',              # Deep black background

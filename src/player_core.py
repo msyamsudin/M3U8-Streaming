@@ -86,25 +86,6 @@ class MpvPlayer:
         if self.mpv:
             self.mpv.terminate()
 
-    # -------------------------------------------------
-    #  New Features
-    # -------------------------------------------------
-    def start_recording(self, filepath):
-        """Start recording the current stream to a file."""
-        if self.mpv:
-            # Use stream-record property
-            self.mpv.stream_record = filepath
-
-    def stop_recording(self):
-        """Stop recording."""
-        if self.mpv:
-            self.mpv.stream_record = ""
-
-    def get_video_tracks(self):
-        """Get list of available video tracks (quality)."""
-        if not self.mpv: return []
-        return self.mpv.track_list
-
     def set_video_track(self, track_id):
         """Set video track by ID. ``None`` (Auto) returns to automatic selection."""
         if self.mpv:

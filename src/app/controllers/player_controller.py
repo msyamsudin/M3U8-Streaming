@@ -173,11 +173,6 @@ class PlayerController(QObject):
         self.terminated.emit()
 
     # ------------------------------------------------------------------ helpers
-    def get_track_list(self) -> list:
-        if not self.is_initialized:
-            return []
-        return self._player.get_video_tracks() or []
-
     def select_video_track(self, track_id) -> None:
         if not self.is_initialized:
             return
@@ -203,7 +198,6 @@ class PlayerController(QObject):
 
             end_file = _mpv.MpvEventID.END_FILE
             file_loaded = _mpv.MpvEventID.FILE_LOADED
-            log_message = _mpv.MpvEventID.LOG_MESSAGE
         except Exception:
             return
 
@@ -216,11 +210,6 @@ class PlayerController(QObject):
         elif event_id == file_loaded:
             if self._state == PlayerState.LOADING:
                 self._set_state(PlayerState.PLAYING)
-        elif event_id == log_message:
-            text = event.get("text") or ""
-            if "error" in text.lower() or "failed" in text.lower():
-                self.error_occurred.emit(text)
-
     def _on_property_pause(self, _name, value) -> None:
         if value is None:
             return
@@ -266,3 +255,26 @@ class PlayerController(QObject):
     @property
     def state(self) -> str:
         return self._state
+
+    @property
+    def duration(self) -> float:
+        """Durasi stream (0.0 bila belum diketahui)."""
+        return self._duration
+
+    @property
+    def volume(self) -> int:
+        """Volume mpv saat ini (100 bila player belum siap)."""
+        if not self.is_initialized or self._player is None or self._player.mpv is None:
+            return 100
+        try:
+            return int(self._player.mpv.volume or 0)
+        except Exception:
+            return 100
+
+    @property
+    def position(self) -> float:
+        """Posisi playback saat ini (0.0 bila player belum siap)."""
+        if not self.is_initialized or self._player is None or self._player.mpv is None:
+            return 0.0
+        pos = self._player.get_time_pos()
+        return float(pos or 0.0)

@@ -7,27 +7,28 @@ from PySide6.QtGui import QBrush, QColor, QIcon, QLinearGradient, QPainter, QPal
 from PySide6.QtWidgets import QApplication
 
 from src.app.main_window import MainWindow
+from src.app.theme.colors import Colors
 
 
 def _apply_dark_palette(app: QApplication) -> None:
     app.setStyle("Fusion")
 
     palette = QPalette()
-    palette.setColor(QPalette.Window, QColor("#0f0f0f"))
-    palette.setColor(QPalette.WindowText, QColor("#ffffff"))
-    palette.setColor(QPalette.Base, QColor("#1a1a1a"))
-    palette.setColor(QPalette.AlternateBase, QColor("#0f0f0f"))
-    palette.setColor(QPalette.ToolTipBase, QColor("#1a1a1a"))
-    palette.setColor(QPalette.ToolTipText, QColor("#ffffff"))
-    palette.setColor(QPalette.Text, QColor("#ffffff"))
-    palette.setColor(QPalette.Button, QColor("#2d2d2d"))
-    palette.setColor(QPalette.ButtonText, QColor("#ffffff"))
-    palette.setColor(QPalette.BrightText, QColor("#ff4444"))
-    palette.setColor(QPalette.Link, QColor("#007ACC"))
-    palette.setColor(QPalette.Highlight, QColor("#007ACC"))
+    palette.setColor(QPalette.Window, QColor(Colors.BG))
+    palette.setColor(QPalette.WindowText, QColor(Colors.TEXT))
+    palette.setColor(QPalette.Base, QColor(Colors.INPUT))
+    palette.setColor(QPalette.AlternateBase, QColor(Colors.BG))
+    palette.setColor(QPalette.ToolTipBase, QColor(Colors.CARD))
+    palette.setColor(QPalette.ToolTipText, QColor(Colors.TEXT))
+    palette.setColor(QPalette.Text, QColor(Colors.TEXT))
+    palette.setColor(QPalette.Button, QColor(Colors.INPUT))
+    palette.setColor(QPalette.ButtonText, QColor(Colors.TEXT))
+    palette.setColor(QPalette.BrightText, QColor(Colors.DANGER))
+    palette.setColor(QPalette.Link, QColor(Colors.ACCENT))
+    palette.setColor(QPalette.Highlight, QColor(Colors.ACCENT_DARK))
     palette.setColor(QPalette.HighlightedText, QColor("#ffffff"))
-    palette.setColor(QPalette.Disabled, QPalette.Text, QColor("#666666"))
-    palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor("#666666"))
+    palette.setColor(QPalette.Disabled, QPalette.Text, QColor(Colors.TEXT_DISABLED))
+    palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(Colors.TEXT_DISABLED))
     app.setPalette(palette)
 
 

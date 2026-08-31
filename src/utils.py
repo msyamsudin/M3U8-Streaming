@@ -2,7 +2,6 @@ import json
 import os
 from datetime import datetime
 import time
-from urllib.parse import urlparse, parse_qs
 
 HISTORY_FILE = "history.json"
 SETTINGS_FILE = "settings.json"
@@ -33,55 +32,15 @@ def format_time(secs):
     s = secs % 60
     return f"{h:02d}:{m:02d}:{s:02d}"
 
-def extract_expiration(url):
-    """Extract expiration timestamp from URL."""
-    try:
-        parsed = urlparse(url)
-        params = parse_qs(parsed.query)
-        # Check common expiration parameters
-        for key in ['expires', 'exp', 'expiration']:
-            if key in params:
-                return int(params[key][0])
-    except:
-        pass
-    return None
-
-def get_remaining_time(timestamp):
-    """Calculate remaining time until expiration in HH:MM format."""
-    if not timestamp:
-        return None
-        
-    try:
-        now = time.time()
-        diff = timestamp - now
-        
-        if diff <= 0:
-            return "Expired"
-            
-        h = int(diff // 3600)
-        m = int((diff % 3600) // 60)
-        
-        return f"{h:02d}:{m:02d}"
-    except:
-        return None
-
-def get_status_color(timestamp):
-    """Get status color based on remaining time."""
-    if not timestamp:
-        return None # Default color
-        
-    try:
-        now = time.time()
-        diff = timestamp - now
-        
-        if diff <= 0:
-            return "#666666" # Grey (Expired)
-        elif diff < 3 * 3600: # Less than 3 hours
-            return "#FFC107" # Amber/Yellow
-        else:
-            return "#4CAF50" # Green
-    except:
-        return None
+def format_clock(seconds):
+    """Format seconds as MM:SS or HH:MM:SS (jam dihilangkan bila nol)."""
+    if seconds is None or seconds < 0:
+        seconds = 0
+    m, s = divmod(int(seconds), 60)
+    h, m = divmod(m, 60)
+    if h:
+        return f"{h:02d}:{m:02d}:{s:02d}"
+    return f"{m:02d}:{s:02d}"
 
 def load_history():
     """Load playback history from JSON file."""
@@ -155,16 +114,6 @@ def write_history(history):
         _write_json_atomic(HISTORY_FILE, history)
     except Exception as e:
         print(f"Error saving history: {e}")
-
-def get_unique_filename(base_path, filename):
-    """Get a unique filename by appending a counter if file exists."""
-    name, ext = os.path.splitext(filename)
-    counter = 1
-    new_filename = filename
-    while os.path.exists(os.path.join(base_path, new_filename)):
-        new_filename = f"{name}_{counter}{ext}"
-        counter += 1
-    return new_filename
 
 def load_settings():
     """Load settings from JSON file."""

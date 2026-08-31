@@ -30,6 +30,7 @@ from src.app.widgets.toast import ToastManager
 from src.app.widgets.video_placeholder import VideoPlaceholder
 from src.app.widgets.video_surface import VideoSurface
 from src.utils import (
+    format_clock,
     format_time,
     get_history_item,
     load_history,
@@ -254,13 +255,13 @@ class MainWindow(QMainWindow):
     def _on_shortcut_volume(self, delta: int) -> None:
         if not self._player.is_initialized:
             return
-        current = self._player._player.mpv.volume or 0
+        current = self._player.volume
         self._player.set_volume(int(max(0, min(130, current + delta))))
 
     def _on_shortcut_mute(self) -> None:
         if not self._player.is_initialized:
             return
-        current = self._player._player.mpv.volume or 0
+        current = self._player.volume
         if current > 0:
             self._saved_volume = int(current)
             self._player.set_volume(0)
@@ -312,9 +313,6 @@ class MainWindow(QMainWindow):
         self._referer_input.editingFinished.connect(self._on_referer_changed)
         self._ua_combo.currentIndexChanged.connect(self._on_ua_combo_changed)
         self._ua_custom_input.editingFinished.connect(self._on_ua_custom_changed)
-        self._cache_forward.valueChanged.connect(lambda _v: self._update_cache_labels())
-        self._cache_back.valueChanged.connect(lambda _v: self._update_cache_labels())
-        self._pause_refresh.valueChanged.connect(lambda _v: None)
         self._apply_btn.clicked.connect(self._on_cache_apply)
         self._delete_btn.clicked.connect(self._on_cache_clear)
         self._reset_btn.clicked.connect(self._on_reset_defaults)
@@ -379,16 +377,9 @@ class MainWindow(QMainWindow):
         self._cache_forward.setValue(CACHE_DEFAULTS["forward"])
         self._cache_back.setValue(CACHE_DEFAULTS["back"])
         self._pause_refresh.setValue(CACHE_DEFAULTS["pause_refresh"])
-        self._update_cache_labels()
         self._persist_settings()
         self._on_cache_apply()
         self._show_toast("Defaults restored", "info")
-
-    def _update_cache_labels(self) -> None:
-        if hasattr(self, "_cache_forward") and self._cache_forward is not None:
-            self._cache_forward_label.setText(f"{self._cache_forward.value()} MB")
-            self._cache_back_label.setText(f"{self._cache_back.value()} MB")
-            self._pause_refresh_label.setText(f"{self._pause_refresh.value()} s")
 
     # ---------------------------------------------------------------- events
     def _on_minimize(self) -> None:
@@ -728,12 +719,7 @@ class MainWindow(QMainWindow):
     def _refresh_debug_state(self) -> None:
         if self._debug_overlay is None:
             return
-        vol = "100"
-        if self._player.is_initialized and self._player._player is not None:
-            try:
-                vol = str(int(self._player._player.mpv.volume))
-            except Exception:
-                pass
+        vol = str(self._player.volume)
         refresh = "N/A"
         if self._pause_started_at is not None:
             elapsed = time.monotonic() - self._pause_started_at
@@ -799,9 +785,6 @@ class MainWindow(QMainWindow):
         self._cache_forward = self._config_bar.cache_forward
         self._cache_back = self._config_bar.cache_back
         self._pause_refresh = self._config_bar.pause_refresh
-        self._cache_forward_label = self._config_bar.cache_forward_label
-        self._cache_back_label = self._config_bar.cache_back_label
-        self._pause_refresh_label = self._config_bar.pause_refresh_label
         self._apply_btn = self._config_bar.apply_btn
         self._delete_btn = self._config_bar.delete_btn
         self._reset_btn = self._config_bar.reset_btn
@@ -924,7 +907,7 @@ class MainWindow(QMainWindow):
         self._player.toggle_pause()
 
     def _on_seek_requested(self, fraction: float) -> None:
-        duration = self._player._duration if self._player else 0.0
+        duration = self._player.duration
         if duration > 0:
             target_seconds = fraction * duration
             self._player.seek(target_seconds, mode="absolute")
@@ -968,10 +951,10 @@ class MainWindow(QMainWindow):
             self._debug_overlay.update_stats({"cache": "-"})
 
     def _on_player_buffered(self, buffered: float) -> None:
-        duration = self._player._duration if self._player else 0.0
+        duration = self._player.duration
         self._control_bar.set_buffered(buffered, duration)
         if self._debug_overlay is not None:
-            self._debug_overlay.update_stats({"buffered": self._format_time(buffered)})
+            self._debug_overlay.update_stats({"buffered": format_clock(buffered)})
 
     def _on_player_track_list(self, tracks: list) -> None:
         self._control_bar.set_track_list(tracks)
@@ -1034,19 +1017,19 @@ class MainWindow(QMainWindow):
                 self._video_placeholder.show_animated()
 
     def _on_player_position(self, pos: float) -> None:
-        duration = self._player._duration if self._player else 0.0
-        self._position_label.setText(f"{self._format_time(pos)} / {self._format_time(duration)}")
+        duration = self._player.duration
+        self._position_label.setText(f"{format_clock(pos)} / {format_clock(duration)}")
         self._control_bar.set_position(pos, duration)
         self._save_progress_periodically(pos, duration)
         if self._debug_overlay is not None:
-            self._debug_overlay.update_stats({"position": self._format_time(pos)})
+            self._debug_overlay.update_stats({"position": format_clock(pos)})
 
     def _on_player_duration(self, duration: float) -> None:
         pos = 0.0
-        self._position_label.setText(f"{self._format_time(pos)} / {self._format_time(duration)}")
+        self._position_label.setText(f"{format_clock(pos)} / {format_clock(duration)}")
         self._control_bar.set_position(pos, duration)
         if self._debug_overlay is not None:
-            self._debug_overlay.update_stats({"duration": self._format_time(duration)})
+            self._debug_overlay.update_stats({"duration": format_clock(duration)})
 
     def _toggle_debug_overlay(self) -> None:
         if self._debug_overlay is None or self._video_container is None:
@@ -1142,7 +1125,7 @@ class MainWindow(QMainWindow):
     def _refresh_stream(self) -> None:
         if not self._current_url or not self._player.is_initialized:
             return
-        pos = self._player._player.get_time_pos() if self._player._player is not None else 0
+        pos = self._player.position
         pos = float(pos or 0)
         self._show_toast("Refreshing stream...", "info")
         self._player.stop()
@@ -1225,16 +1208,6 @@ class MainWindow(QMainWindow):
 
     def _log_status(self, message: str) -> None:
         self.statusBar().showMessage(message, 5000)
-
-    @staticmethod
-    def _format_time(seconds: float) -> str:
-        if seconds is None or seconds < 0:
-            seconds = 0
-        m, s = divmod(int(seconds), 60)
-        h, m = divmod(m, 60)
-        if h:
-            return f"{h:02d}:{m:02d}:{s:02d}"
-        return f"{m:02d}:{s:02d}"
 
 
 # ---------------------------------------------------------------- Config bar
@@ -1322,13 +1295,13 @@ class ConfigBar(QWidget):
         cache_label.setObjectName("fieldLabel")
         grid.addWidget(cache_label, 2, 0, 1, 1, Qt.AlignVCenter)
 
-        self.cache_forward, self.cache_forward_label = self._build_field(
+        self.cache_forward = self._build_field(
             "Forward", 0, 500, 100, "MB", row=2, col=1,
         )
-        self.cache_back, self.cache_back_label = self._build_field(
+        self.cache_back = self._build_field(
             "Back", 0, 500, 100, "MB", row=2, col=2,
         )
-        self.pause_refresh, self.pause_refresh_label = self._build_field(
+        self.pause_refresh = self._build_field(
             "Refresh", 5, 600, 60, "s", row=2, col=3,
         )
 
@@ -1355,7 +1328,6 @@ class ConfigBar(QWidget):
         self.cache_forward.setValue(int(forward))
         self.cache_back.setValue(int(back))
         self.pause_refresh.setValue(int(pause_refresh))
-        self._update_labels()
 
     def _build_field(
         self,
@@ -1392,14 +1364,4 @@ class ConfigBar(QWidget):
         if card is not None and card.layout() is not None:
             card.layout().addWidget(wrapper, row, col, 1, 1)
 
-        label = QLabel(f"{default} {suffix}")
-        label.setObjectName("formLabel")
-        label.setStyleSheet("color: #71717a; font-size: 8pt;")
-        label.setVisible(False)
-        return spin, label
-
-    def _update_labels(self) -> None:
-        if hasattr(self, "cache_forward_label"):
-            self.cache_forward_label.setText(f"{self.cache_forward.value()} MB")
-            self.cache_back_label.setText(f"{self.cache_back.value()} MB")
-            self.pause_refresh_label.setText(f"{self.pause_refresh.value()} s")
+        return spin
