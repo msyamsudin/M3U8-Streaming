@@ -51,7 +51,10 @@ class MpvPlayer:
         # Apply options
         for k, v in options.items():
             setattr(self.mpv, k, v)
-            
+
+        # MPV keeps the pause property across loadfile calls. A refresh that
+        # replaces a manually paused source must explicitly resume decoding.
+        self.mpv.pause = False
         self.mpv.play(url)
 
     def pause(self):
