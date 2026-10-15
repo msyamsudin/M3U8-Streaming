@@ -1202,7 +1202,7 @@ class MainWindow(QMainWindow):
         if not self._player.is_initialized:
             return
         current = self._player.position
-        if abs(current - pos) <= 2.0:
+        if abs(current - pos) <= 0.5:
             return
         if attempt < 10:
             self._retry_seek(pos, attempt + 1)

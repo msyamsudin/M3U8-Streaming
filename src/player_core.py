@@ -63,7 +63,9 @@ class MpvPlayer:
                 url,
                 "replace",
                 "-1",
-                f"start=+{float(start_seconds):.3f},hr-seek=yes",
+                # HLS demuxers can seek to the next segment instead of the
+                # preceding keyframe. Read earlier, then decode to the target.
+                f"start=+{float(start_seconds):.3f},hr-seek=yes,hr-seek-demuxer-offset=10",
             )
         else:
             self.mpv.play(url)
