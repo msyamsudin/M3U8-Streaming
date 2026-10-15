@@ -102,6 +102,9 @@ class MainWindow(QMainWindow):
         self._current_user_agent: str = ""
         self._last_cache_state: dict = {}
         self._pause_started_at: Optional[float] = None
+        self._pause_countdown_timer = QTimer(self)
+        self._pause_countdown_timer.setInterval(250)
+        self._pause_countdown_timer.timeout.connect(self._update_pause_refresh_countdown)
         self._last_progress_save_second: int = -1
         self._resume_prompted_for_url: str = ""
         self._auto_hide_timer: Optional[QTimer] = None
@@ -869,6 +872,11 @@ class MainWindow(QMainWindow):
         self._state_label.setObjectName("statusReady")
         layout.addWidget(self._state_label)
 
+        self._pause_refresh_label = QLabel()
+        self._pause_refresh_label.setObjectName("pauseRefreshCountdown")
+        self._pause_refresh_label.setVisible(False)
+        layout.addWidget(self._pause_refresh_label)
+
         layout.addStretch(1)
 
         self._speed_label = QLabel("-")
@@ -1053,13 +1061,22 @@ class MainWindow(QMainWindow):
         if state == PlayerState.PAUSED:
             if self._pause_started_at is None:
                 self._pause_started_at = time.monotonic()
+            self._pause_countdown_timer.start()
+            self._update_pause_refresh_countdown()
         elif state == PlayerState.PLAYING:
             self._pause_started_at = None
+            self._pause_countdown_timer.stop()
+            self._pause_refresh_label.hide()
             QTimer.singleShot(500, self._maybe_prompt_resume)
         elif state in (PlayerState.STOPPED, PlayerState.ERROR, PlayerState.IDLE):
             self._pause_started_at = None
+            self._pause_countdown_timer.stop()
+            self._pause_refresh_label.hide()
             if self._speed_label is not None:
                 self._speed_label.setText("-")
+        elif state == PlayerState.LOADING:
+            self._pause_countdown_timer.stop()
+            self._pause_refresh_label.hide()
         if self._debug_overlay is not None:
             self._debug_overlay.update_stats({"state": state})
         # Show / hide placeholder based on player state
@@ -1077,6 +1094,29 @@ class MainWindow(QMainWindow):
                 self._buffering_indicator.show_indicator()
             else:
                 self._buffering_indicator.hide_indicator()
+
+    def _update_pause_refresh_countdown(self) -> None:
+        if (
+            self._pause_started_at is None
+            or self._player.state != PlayerState.PAUSED
+            or not self._current_url
+            or not hasattr(self, "_pause_refresh_label")
+        ):
+            if hasattr(self, "_pause_refresh_label"):
+                self._pause_refresh_label.hide()
+            return
+
+        threshold = self._pause_refresh.value()
+        elapsed = time.monotonic() - self._pause_started_at
+        remaining = max(0, threshold - int(elapsed))
+        if remaining:
+            self._pause_refresh_label.setText(f"Refresh on resume in {remaining}s")
+        else:
+            self._pause_refresh_label.setText("Refresh on resume now")
+        self._pause_refresh_label.setToolTip(
+            "The stream refreshes when you resume playback after the countdown reaches zero."
+        )
+        self._pause_refresh_label.show()
 
     def _on_player_position(self, pos: float) -> None:
         duration = self._player.duration

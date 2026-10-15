@@ -275,6 +275,12 @@ QLabel#statusLoading  { color: #fafafa; font-weight: 500; }
 QLabel#statusPlaying  { color: #3b82f6; font-weight: 500; }
 QLabel#statusPaused   { color: #f59e0b; font-weight: 500; }
 QLabel#statusStopped  { color: #ef4444; font-weight: 500; }
+QLabel#pauseRefreshCountdown {
+    color: #fbbf24;
+    font-family: "Consolas", "SF Mono", monospace;
+    font-size: 8pt;
+    background: transparent;
+}
 
 /* Video placeholder */
 QWidget#videoContainer {
