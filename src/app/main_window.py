@@ -1185,12 +1185,28 @@ class MainWindow(QMainWindow):
             return
         try:
             self._player.seek(pos, mode="absolute")
-            return
         except Exception:
             if attempt < 10:
                 QTimer.singleShot(500, lambda: self._retry_seek(pos, attempt + 1))
             else:
                 self._show_toast("Failed to resume: stream is not seekable", "error")
+            return
+
+        # MPV may accept a seek command while the demuxer is still settling,
+        # then remain at the beginning without raising an error. Verify the
+        # actual playback position and retry until the target is reached.
+        QTimer.singleShot(750, lambda: self._verify_resume_seek(pos, attempt))
+
+    def _verify_resume_seek(self, pos: float, attempt: int) -> None:
+        if not self._player.is_initialized:
+            return
+        current = self._player.position
+        if abs(current - pos) <= 2.0:
+            return
+        if attempt < 10:
+            self._retry_seek(pos, attempt + 1)
+        else:
+            self._show_toast("Failed to resume at the previous position", "error")
 
     def _refresh_stream(self) -> None:
         if not self._current_url or not self._player.is_initialized:
@@ -1212,7 +1228,7 @@ class MainWindow(QMainWindow):
         if pos is None:
             return
         self._refresh_seek_position = None
-        QTimer.singleShot(0, lambda: self._retry_seek(pos))
+        QTimer.singleShot(500, lambda: self._retry_seek(pos))
 
     def _show_shortcuts_dialog(self) -> None:
         message = "\n".join(
