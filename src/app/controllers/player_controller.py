@@ -33,7 +33,6 @@ class PlayerController(QObject):
     error_occurred = Signal(str)
     initialized = Signal()
     terminated = Signal()
-    file_loaded = Signal()
 
     POLL_INTERVAL_MS = 250
 
@@ -151,11 +150,17 @@ class PlayerController(QObject):
             return
         self._player.set_wid(wid)
 
-    def play(self, url: str, headers: Optional[dict] = None, user_agent: Optional[str] = None) -> None:
+    def play(
+        self,
+        url: str,
+        headers: Optional[dict] = None,
+        user_agent: Optional[str] = None,
+        start_seconds: Optional[float] = None,
+    ) -> None:
         if not self.is_initialized:
             self.error_occurred.emit("Player not initialized")
             return
-        self._player.play(url, headers=headers, user_agent=user_agent)
+        self._player.play(url, headers=headers, user_agent=user_agent, start_seconds=start_seconds)
         self._set_state(PlayerState.LOADING)
 
     def toggle_pause(self) -> None:
@@ -233,7 +238,6 @@ class PlayerController(QObject):
             else:
                 self._set_state(PlayerState.STOPPED)
         elif event_id == file_loaded:
-            self.file_loaded.emit()
             if self._state in (PlayerState.LOADING, PlayerState.ERROR, PlayerState.STOPPED):
                 self._set_state(PlayerState.PLAYING)
     def _on_property_pause(self, _name, value) -> None:

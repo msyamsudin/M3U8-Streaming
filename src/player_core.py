@@ -37,7 +37,7 @@ class MpvPlayer:
         except Exception as e:
             raise RuntimeError(f"Failed to initialize MPV: {e}")
 
-    def play(self, url, headers=None, user_agent=None):
+    def play(self, url, headers=None, user_agent=None, start_seconds=None):
         if not self.mpv: return
         
         options = {}
@@ -55,7 +55,18 @@ class MpvPlayer:
         # MPV keeps the pause property across loadfile calls. A refresh that
         # replaces a manually paused source must explicitly resume decoding.
         self.mpv.pause = False
-        self.mpv.play(url)
+        if start_seconds is not None and start_seconds > 0:
+            # Pass the resume point as a per-file load option so MPV seeks as
+            # part of opening the replacement stream.
+            self.mpv.command(
+                "loadfile",
+                url,
+                "replace",
+                "-1",
+                f"start=+{float(start_seconds):.3f}",
+            )
+        else:
+            self.mpv.play(url)
 
     def pause(self):
         if self.mpv:
