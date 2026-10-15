@@ -929,6 +929,7 @@ class MainWindow(QMainWindow):
         self._player.track_list_changed.connect(self._on_player_track_list)
         self._player.network_speed_changed.connect(self._on_player_network_speed)
         self._player.cache_state_changed.connect(self._on_player_cache_state)
+        self._player.file_loaded.connect(self._on_refresh_file_loaded)
 
     def _on_play_pause(self) -> None:
         if self._player.state == PlayerState.PAUSED and self._pause_started_at is not None:
@@ -1130,6 +1131,7 @@ class MainWindow(QMainWindow):
         self._current_user_agent = user_agent or ""
         self._last_progress_save_second = -1
         self._pause_started_at = None
+        self._refresh_seek_position = None
         self._player.play(url, headers=headers, user_agent=user_agent)
         if add_history:
             self._history_panel.add_entry(
@@ -1183,7 +1185,7 @@ class MainWindow(QMainWindow):
         if not self._player.is_initialized:
             return
         try:
-            self._player.seek(pos, mode="absolute")
+            self._player.seek(pos, mode="absolute+exact")
         except Exception:
             if attempt < 10:
                 QTimer.singleShot(500, lambda: self._retry_seek(pos, attempt + 1))
@@ -1214,6 +1216,7 @@ class MainWindow(QMainWindow):
         pos = float(pos or 0)
         self._show_toast("Refreshing stream...", "info")
         self._player.apply_cache_settings(self._cache_forward.value(), self._cache_back.value())
+        self._refresh_seek_position = pos
         self._player.play(
             self._current_url,
             headers=self._current_headers,
@@ -1221,6 +1224,15 @@ class MainWindow(QMainWindow):
             start_seconds=pos,
         )
         self._pause_started_at = None
+
+    def _on_refresh_file_loaded(self) -> None:
+        pos = getattr(self, "_refresh_seek_position", None)
+        if pos is None:
+            return
+        self._refresh_seek_position = None
+        # HLS demuxers can start on the next segment boundary. Follow the
+        # per-file start option with an exact seek once MPV has loaded the file.
+        QTimer.singleShot(500, lambda: self._retry_seek(pos))
 
     def _show_shortcuts_dialog(self) -> None:
         message = "\n".join(

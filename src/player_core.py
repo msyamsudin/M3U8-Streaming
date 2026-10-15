@@ -63,7 +63,7 @@ class MpvPlayer:
                 url,
                 "replace",
                 "-1",
-                f"start=+{float(start_seconds):.3f}",
+                f"start=+{float(start_seconds):.3f},hr-seek=yes",
             )
         else:
             self.mpv.play(url)
