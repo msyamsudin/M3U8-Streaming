@@ -929,6 +929,7 @@ class MainWindow(QMainWindow):
         self._player.track_list_changed.connect(self._on_player_track_list)
         self._player.network_speed_changed.connect(self._on_player_network_speed)
         self._player.cache_state_changed.connect(self._on_player_cache_state)
+        self._player.file_loaded.connect(self._on_refresh_file_loaded)
 
     def _on_play_pause(self) -> None:
         if self._player.state == PlayerState.PAUSED and self._pause_started_at is not None:
@@ -936,6 +937,11 @@ class MainWindow(QMainWindow):
             if elapsed >= self._pause_refresh.value():
                 self._refresh_stream()
                 return
+        elif self._player.state in (PlayerState.ERROR, PlayerState.STOPPED) and self._current_url:
+            # A long pause can make the source expire before the user resumes.
+            # Reload it instead of only toggling the stale MPV pause property.
+            self._refresh_stream()
+            return
         self._player.toggle_pause()
 
     def _on_seek_requested(self, fraction: float) -> None:
@@ -1192,15 +1198,21 @@ class MainWindow(QMainWindow):
         pos = self._player.position
         pos = float(pos or 0)
         self._show_toast("Refreshing stream...", "info")
-        self._player.stop()
         self._player.apply_cache_settings(self._cache_forward.value(), self._cache_back.value())
+        self._refresh_seek_position = pos
         self._player.play(
             self._current_url,
             headers=self._current_headers,
             user_agent=self._current_user_agent,
         )
         self._pause_started_at = None
-        QTimer.singleShot(500, lambda: self._retry_seek(pos))
+
+    def _on_refresh_file_loaded(self) -> None:
+        pos = getattr(self, "_refresh_seek_position", None)
+        if pos is None:
+            return
+        self._refresh_seek_position = None
+        QTimer.singleShot(0, lambda: self._retry_seek(pos))
 
     def _show_shortcuts_dialog(self) -> None:
         message = "\n".join(

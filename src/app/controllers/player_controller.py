@@ -33,6 +33,7 @@ class PlayerController(QObject):
     error_occurred = Signal(str)
     initialized = Signal()
     terminated = Signal()
+    file_loaded = Signal()
 
     POLL_INTERVAL_MS = 250
 
@@ -223,12 +224,17 @@ class PlayerController(QObject):
 
         if event_id == end_file:
             reason = (event.get("reason") or "eof").lower()
+            # Replacing a source emits END_FILE for the old item. Do not let
+            # that event cancel the LOADING state of the new source.
+            if self._state == PlayerState.LOADING and reason != "error":
+                return
             if reason == "error":
                 self._set_state(PlayerState.ERROR)
             else:
                 self._set_state(PlayerState.STOPPED)
         elif event_id == file_loaded:
-            if self._state == PlayerState.LOADING:
+            self.file_loaded.emit()
+            if self._state in (PlayerState.LOADING, PlayerState.ERROR, PlayerState.STOPPED):
                 self._set_state(PlayerState.PLAYING)
     def _on_property_pause(self, _name, value) -> None:
         if value is None or self._settle_pending:
