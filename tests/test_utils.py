@@ -114,5 +114,57 @@ class TestPlayerStateMachine(unittest.TestCase):
         self.assertEqual(pc.state, PlayerState.LOADING)
 
 
+class TestNetworkSpeed(unittest.TestCase):
+    """Speed indicator harus membaca key asli mpv.
+
+    ``demuxer-cache-state`` memakai key ber-tanda-hubung (``raw-input-rate``);
+    key lama ``input-bitrate`` tidak ada sehingga speed selalu 0.
+    """
+
+    def test_speed_read_from_real_mpv_key(self):
+        from src.player_core import network_speed_from_cache_state
+        state = {"total-bytes": 21670384, "fw-bytes": 7171648, "raw-input-rate": 928792}
+        self.assertEqual(network_speed_from_cache_state(state), 928792.0)
+
+    def test_speed_zero_when_key_missing(self):
+        from src.player_core import network_speed_from_cache_state
+        self.assertEqual(network_speed_from_cache_state({}), 0.0)
+        self.assertEqual(network_speed_from_cache_state(None), 0.0)
+        self.assertEqual(network_speed_from_cache_state({"raw-input-rate": None}), 0.0)
+        self.assertEqual(network_speed_from_cache_state({"raw-input-rate": "n/a"}), 0.0)
+
+    def test_cache_buffered_bytes(self):
+        from src.player_core import cache_buffered_bytes
+        self.assertEqual(
+            cache_buffered_bytes({"fw-bytes": 7171648, "total-bytes": 21670384}),
+            (7171648, 21670384),
+        )
+        self.assertEqual(cache_buffered_bytes({}), (None, None))
+        self.assertEqual(cache_buffered_bytes(None), (None, None))
+
+    def test_poll_emits_network_speed_signal(self):
+        from src.app.controllers.player_controller import PlayerController, PlayerState
+
+        class FakePlayer:
+            mpv = object()  # makes is_initialized True
+
+            def get_time_pos(self):
+                return 12.0
+
+            def get_demuxer_cache_state(self):
+                return {"raw-input-rate": 1234567, "fw-bytes": 100, "total-bytes": 200}
+
+            def get_buffered_time(self):
+                return 13.5
+
+        pc = PlayerController(None)
+        pc._player = FakePlayer()
+        pc._set_state(PlayerState.PLAYING)
+        speeds = []
+        pc.network_speed_changed.connect(speeds.append)
+        pc._poll()
+        self.assertEqual(speeds, [1234567.0])
+
+
 if __name__ == "__main__":
     unittest.main()

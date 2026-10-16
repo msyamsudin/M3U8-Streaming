@@ -18,6 +18,41 @@ if not dll_found:
 
 import mpv
 
+# --- mpv demuxer-cache-state keys -----------------------------------------
+# python-mpv converts dashes only for the *property name* it looks up
+# (``demuxer_cache_state`` -> ``demuxer-cache-state``). The keys *inside* the
+# returned node map keep mpv's own hyphenated spelling, and an unknown key
+# returns None instead of raising, so a misnamed key silently degrades the
+# display (this is what pinned the speed indicator at 0).
+CACHE_STATE_SPEED_KEY = "raw-input-rate"      # estimated input rate, bytes/s
+CACHE_STATE_FW_BYTES_KEY = "fw-bytes"         # buffered ahead of the reader
+CACHE_STATE_TOTAL_BYTES_KEY = "total-bytes"   # all bytes held by the cache
+
+
+def _as_float(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def network_speed_from_cache_state(cache_state):
+    """Network input rate in bytes/second, 0.0 when unknown."""
+    if not isinstance(cache_state, dict):
+        return 0.0
+    return _as_float(cache_state.get(CACHE_STATE_SPEED_KEY)) or 0.0
+
+
+def cache_buffered_bytes(cache_state):
+    """``(forward-buffered, total-cached)`` bytes; each ``None`` if unknown."""
+    if not isinstance(cache_state, dict):
+        return None, None
+    fw = _as_float(cache_state.get(CACHE_STATE_FW_BYTES_KEY))
+    total = _as_float(cache_state.get(CACHE_STATE_TOTAL_BYTES_KEY))
+    return (None if fw is None else int(fw),
+            None if total is None else int(total))
+
+
 class MpvPlayer:
     def __init__(self, wid=None):
         self.mpv = None

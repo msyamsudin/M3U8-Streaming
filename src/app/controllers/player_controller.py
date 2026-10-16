@@ -2,7 +2,7 @@ from typing import Optional
 
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
 
-from src.player_core import MpvPlayer
+from src.player_core import MpvPlayer, network_speed_from_cache_state
 
 
 class PlayerState:
@@ -134,8 +134,7 @@ class PlayerController(QObject):
         cache_state = self._player.get_demuxer_cache_state() or {}
         if cache_state:
             self.cache_state_changed.emit(cache_state)
-            speed = float(cache_state.get("input-bitrate") or 0.0)
-            self.network_speed_changed.emit(speed)
+            self.network_speed_changed.emit(network_speed_from_cache_state(cache_state))
 
         buffered = self._player.get_buffered_time()
         if buffered is not None:

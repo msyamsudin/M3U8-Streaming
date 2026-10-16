@@ -41,6 +41,7 @@ from src.utils import (
     save_settings,
 )
 from src.config import USER_AGENTS
+from src.player_core import cache_buffered_bytes
 
 
 DEFAULT_REFERER = "https://www.patreon.com"
@@ -989,14 +990,15 @@ class MainWindow(QMainWindow):
         if not state:
             self._debug_overlay.update_stats({"cache": "-"})
             return
-        used = state.get("cache-used")
-        total = state.get("cache-size")
-        if used is not None and total is not None:
-            used_mb = int(used) / (1024 * 1024)
-            total_mb = int(total) / (1024 * 1024)
-            self._debug_overlay.update_stats({"cache": f"{used_mb:.1f} / {total_mb:.1f} MB"})
-        else:
+        # fw-bytes = buffered ahead of the reader, total-bytes = the whole
+        # demuxer cache (mpv has no cache-used/cache-size keys).
+        fw_bytes, total_bytes = cache_buffered_bytes(state)
+        if fw_bytes is None or total_bytes is None:
             self._debug_overlay.update_stats({"cache": "-"})
+            return
+        fw_mb = fw_bytes / (1024 * 1024)
+        total_mb = total_bytes / (1024 * 1024)
+        self._debug_overlay.update_stats({"cache": f"{fw_mb:.1f} MB fw / {total_mb:.1f} MB"})
 
     def _on_player_buffered(self, buffered: float) -> None:
         duration = self._player.duration
