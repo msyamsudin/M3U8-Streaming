@@ -17,6 +17,7 @@ Pemutar streaming berbasis **HLS (.m3u8)** dengan dukungan **Referer/User-Agent 
 |-------|-----------|
 | 🎬 **Pemutaran Stream** | Mendukung HLS (.m3u8) via libmpv |
 | 🕒 **Riwayat URL** | Menyimpan URL dan posisi terakhir |
+| ⏳ **Expiry Tag** | Menampilkan sisa masa aktif link (`expires`/JWT/policy CDN) di riwayat; token opaque memakai estimasi 24 jam berlabel `~` |
 | ⏯️ **Continue Watching** | Menawarkan resume dari posisi terakhir |
 | 🚀 **Cache Tuning** | Input forward/back cache dan refresh threshold |
 | 🔄 **Pause Refresh** | Reload stream saat lanjut setelah pause melebihi threshold |
@@ -212,7 +213,9 @@ python -m unittest discover tests
 ```
 
 Mencakup: format waktu, roundtrip riwayat + meta (referer/UA/headers), dedup & limit 50,
-tulis JSON atomik, backup file korup, dan migrasi User-Agent lama.
+tulis JSON atomik, backup file korup, migrasi User-Agent lama, deteksi expiry URL
+(epoch/ISO, AWS/GCS signed URL, CloudFront policy, Akamai `hdnts`, JWT `exp`), serta estimasi
+24 jam untuk token opaque berdasarkan `first_seen`.
 
 ---
 

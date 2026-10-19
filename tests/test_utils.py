@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -72,6 +73,21 @@ class TestHistoryFile(unittest.TestCase):
         utils.save_history("http://x/2")
         data = utils.load_history()
         self.assertNotIn("referer", data[0])
+        self.assertNotIn("expires_at", data[0])
+        self.assertIn("first_seen", data[0])
+
+    def test_save_history_preserves_first_seen(self):
+        utils.save_history("http://x/keep")
+        first_seen = utils.load_history()[0]["first_seen"]
+        utils.save_history("http://x/keep")
+        self.assertEqual(utils.load_history()[0]["first_seen"], first_seen)
+
+    def test_save_history_stores_expiry(self):
+        expires = int(time.time()) + 7200
+        utils.save_history(f"http://x/live.m3u8?expires={expires}")
+        data = utils.load_history()
+        self.assertIn("expires_at", data[0])
+        self.assertEqual(data[0]["expiry_source"], "expires")
 
     def test_dedup_and_limit_50(self):
         for i in range(60):

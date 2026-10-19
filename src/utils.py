@@ -3,6 +3,8 @@ import os
 from datetime import datetime
 import time
 
+from src.url_expiry import url_expiry_fields
+
 HISTORY_FILE = "history.json"
 SETTINGS_FILE = "settings.json"
 
@@ -66,21 +68,31 @@ def save_history(url, name=None, meta=None):
     user_agent, headers) so it can be restored later.
     """
     history = load_history()
-    
-    # Check for existing position
-    last_pos = 0
+
+    # Entry lama dengan URL yang sama: pertahankan posisi dan first_seen.
+    previous = None
     for h in history:
-        if h['url'] == url:
-            last_pos = h.get('last_position', 0)
+        if h.get('url') == url:
+            previous = h
             break
-            
+    last_pos = previous.get('last_position', 0) if previous else 0
+    now = datetime.now()
+    first_seen = None
+    if previous:
+        first_seen = previous.get('first_seen') or previous.get('timestamp')
+    if not first_seen:
+        first_seen = now.isoformat()
+
     # Create entry
     entry = {
         "url": url,
         "name": name or url,
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": now.isoformat(),
+        "first_seen": first_seen,
         "last_position": last_pos
     }
+    # Simpan expiry absolut agar badge di history tidak menebak-nebak.
+    entry.update(url_expiry_fields(url))
     if meta:
         entry["referer"] = meta.get("referer", "")
         entry["user_agent"] = meta.get("user_agent", "")

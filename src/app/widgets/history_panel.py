@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from PySide6.QtCore import QSize, Qt, QTimer, Signal
+from PySide6.QtCore import QRect, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QColor, QFont, QPainter
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -21,12 +21,23 @@ from PySide6.QtWidgets import (
 )
 
 from src.app.theme.animations import Anim
+from src.url_expiry import apply_expiry_fields, expiry_badge, expiry_tooltip
 from src.utils import (
     format_time,
     load_history,
     save_history,
     write_history,
 )
+
+# Warna chip expiry: (background, teks).
+_EXPIRY_TONES = {
+    "ok": ("#12303D", "#63C8F5"),
+    "soon": ("#3A2A10", "#FFC266"),
+    "estimate": ("#2B2414", "#D9C27A"),
+    "expired": ("#3A1616", "#FF7B7B"),
+    "unknown": ("#242424", "#9A9A9A"),
+    "none": ("#1E1E1E", "#777777"),
+}
 
 
 class _HistoryItemDelegate(QStyledItemDelegate):
@@ -43,7 +54,14 @@ class _HistoryItemDelegate(QStyledItemDelegate):
     PROGRESS_HEIGHT = 3
 
     def sizeHint(self, option: QStyleOptionViewItem, index) -> QSize:
-        return QSize(option.rect.width() or 280, 68)
+        # Lebar mengikuti viewport agar tidak memicu scroll horizontal saat
+        # scrollbar vertikal muncul (viewport ikut menyempit).
+        view = self.parent()
+        try:
+            width = view.viewport().width()
+        except AttributeError:
+            width = option.rect.width() or 280
+        return QSize(max(1, width), 68)
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index) -> None:
         painter.save()
@@ -53,25 +71,42 @@ class _HistoryItemDelegate(QStyledItemDelegate):
         is_selected = bool(option.state & QStyle.State_Selected)
         is_hover = bool(option.state & QStyle.State_MouseOver)
 
+        # Batasi area gambar ke viewport yang benar-benar terlihat. Dengan
+        # begitu badge expiry tidak pernah berada di luar layar/scroll.
+        view = self.parent()
+        try:
+            viewport_width = view.viewport().width()
+        except AttributeError:
+            viewport_width = rect.width()
+        visible_width = max(
+            1,
+            min(rect.width() or viewport_width, viewport_width - max(0, rect.x())),
+        )
+        content_rect = QRect(rect.x(), rect.y(), visible_width, rect.height())
+
         if is_selected:
-            painter.fillRect(rect, QColor("#007ACC"))
+            painter.fillRect(content_rect, QColor("#007ACC"))
         elif is_hover:
-            painter.fillRect(rect, QColor("#1a1a1a"))
+            painter.fillRect(content_rect, QColor("#1a1a1a"))
         else:
-            painter.fillRect(rect, QColor("#0f0f0f"))
+            painter.fillRect(content_rect, QColor("#0f0f0f"))
 
         title = index.data(Qt.UserRole) or ""
         url = index.data(Qt.UserRole + 1) or ""
         ts = index.data(Qt.UserRole + 2) or ""
         pos = index.data(Qt.UserRole + 3) or 0
         duration = index.data(Qt.UserRole + 4) or 0
+        entry = index.data(Qt.UserRole + 5) or {}
 
-        text_x = rect.x() + self.PADDING_X
-        text_w = rect.width() - self.PADDING_X * 2
+        text_w = max(1, visible_width - self.PADDING_X * 2)
 
         # Title
-        title_rect = rect.adjusted(self.PADDING_X, self.PADDING_Y, -self.PADDING_X, 0)
-        title_rect.setHeight(20)
+        title_rect = QRect(
+            content_rect.x() + self.PADDING_X,
+            content_rect.y() + self.PADDING_Y,
+            text_w,
+            20,
+        )
         title_font = QFont(option.font)
         title_font.setBold(True)
         title_font.setPointSize(title_font.pointSize())
@@ -81,8 +116,12 @@ class _HistoryItemDelegate(QStyledItemDelegate):
         painter.drawText(title_rect, Qt.AlignLeft | Qt.AlignVCenter, elided_title)
 
         # URL (gray, smaller)
-        url_rect = title_rect.adjusted(0, title_rect.height() + self.SPACING, 0, 0)
-        url_rect.setHeight(16)
+        url_rect = QRect(
+            title_rect.x(),
+            title_rect.y() + title_rect.height() + self.SPACING,
+            text_w,
+            16,
+        )
         url_font = QFont(option.font)
         url_font.setPointSize(url_font.pointSize() - 1)
         painter.setFont(url_font)
@@ -90,35 +129,64 @@ class _HistoryItemDelegate(QStyledItemDelegate):
         elided_url = painter.fontMetrics().elidedText(url, Qt.ElideMiddle, text_w)
         painter.drawText(url_rect, Qt.AlignLeft | Qt.AlignVCenter, elided_url)
 
-        # Footer: timestamp | position
-        footer_rect = url_rect.adjusted(0, url_rect.height() + self.SPACING, 0, 0)
-        footer_rect.setHeight(14)
+        # Footer: timestamp | position | expiry badge
+        footer_rect = QRect(
+            url_rect.x(),
+            url_rect.y() + url_rect.height() + self.SPACING,
+            text_w,
+            14,
+        )
         footer_font = QFont(option.font)
         footer_font.setPointSize(footer_font.pointSize() - 1)
-        painter.setFont(footer_font)
-        painter.setPen(QColor("#dddddd") if is_selected else QColor("#666666"))
         pos_text = f"Pos {format_time(pos)}" if pos else ""
         if duration and duration > 0:
             pos_text = f"{pos_text} / {format_time(duration)}" if pos_text else f"Dur {format_time(duration)}"
         footer_text = ts
         if pos_text:
             footer_text = f"{footer_text}  -  {pos_text}"
-        elided_footer = painter.fontMetrics().elidedText(footer_text, Qt.ElideRight, text_w)
+
+        badge_text, badge_tone = expiry_badge(entry)
+        badge_text = f"\u23F3 {badge_text}"
+        badge_font = QFont(footer_font)
+        badge_font.setBold(True)
+        painter.setFont(badge_font)
+        badge_w = painter.fontMetrics().horizontalAdvance(badge_text) + 12
+        badge_h = 16
+        badge_rect = QRect(
+            content_rect.x() + visible_width - self.PADDING_X - badge_w,
+            footer_rect.y() - 1,
+            badge_w,
+            badge_h,
+        )
+        fill_color, text_color = _EXPIRY_TONES.get(badge_tone, _EXPIRY_TONES["none"])
+
+        painter.setFont(footer_font)
+        painter.setPen(QColor("#dddddd") if is_selected else QColor("#666666"))
+        footer_available = max(0, text_w - badge_w - 8)
+        elided_footer = painter.fontMetrics().elidedText(footer_text, Qt.ElideRight, footer_available)
         painter.drawText(footer_rect, Qt.AlignLeft | Qt.AlignVCenter, elided_footer)
+
+        painter.setFont(badge_font)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(fill_color))
+        painter.drawRoundedRect(badge_rect, 3, 3)
+        painter.setPen(QColor(text_color))
+        painter.drawText(badge_rect, Qt.AlignCenter, badge_text)
 
         # Progress bar
         if duration and duration > 0 and pos:
             progress = max(0.0, min(1.0, pos / duration))
-            prog_y = rect.bottom() - self.PROGRESS_HEIGHT
+            prog_y = content_rect.bottom() - self.PROGRESS_HEIGHT
+            filled_w = int(visible_width * progress)
             painter.setPen(Qt.NoPen)
             painter.setBrush(QColor("#005FA3"))
-            painter.drawRect(rect.x(), prog_y, int(rect.width() * progress), self.PROGRESS_HEIGHT)
+            painter.drawRect(content_rect.x(), prog_y, filled_w, self.PROGRESS_HEIGHT)
             if not is_selected:
                 painter.setBrush(QColor("#1a1a1a"))
                 painter.drawRect(
-                    rect.x() + int(rect.width() * progress),
+                    content_rect.x() + filled_w,
                     prog_y,
-                    rect.width() - int(rect.width() * progress),
+                    visible_width - filled_w,
                     self.PROGRESS_HEIGHT,
                 )
 
@@ -170,6 +238,8 @@ class HistoryPanel(QWidget):
         self._list.setItemDelegate(_HistoryItemDelegate(self._list))
         self._list.setSelectionMode(QAbstractItemView.SingleSelection)
         self._list.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+        # Jangan pernah butuh scroll horizontal: badge expiry harus langsung terlihat.
+        self._list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._list.setContextMenuPolicy(Qt.CustomContextMenu)
         self._list.customContextMenuRequested.connect(self._on_context_menu)
         self._list.itemClicked.connect(self._on_item_clicked)
@@ -187,6 +257,12 @@ class HistoryPanel(QWidget):
         outer.addLayout(btn_row)
 
         self.refresh()
+
+        # Badge "x left" ikut menua walau panel sedang terbuka.
+        self._expiry_timer = QTimer(self)
+        self._expiry_timer.setInterval(30_000)
+        self._expiry_timer.timeout.connect(self._refresh_expiry_badges)
+        self._expiry_timer.start()
 
     # ------------------------------------------------------------------ public
     def refresh(self) -> None:
@@ -254,7 +330,9 @@ class HistoryPanel(QWidget):
     def _populate(self) -> None:
         self._list.clear()
         self._items.clear()
+        migrated = False
         for entry in self._history:
+            migrated = apply_expiry_fields(entry) or migrated
             item = QListWidgetItem()
             ts = entry.get("timestamp", "")
             if ts:
@@ -270,8 +348,14 @@ class HistoryPanel(QWidget):
             item.setData(Qt.UserRole + 3, entry.get("last_position", 0) or 0)
             item.setData(Qt.UserRole + 4, entry.get("duration", 0) or 0)
             item.setData(Qt.UserRole + 5, entry)
+            tooltip = expiry_tooltip(entry)
+            if tooltip:
+                item.setToolTip(tooltip)
             self._items[entry.get("url", "")] = item
             self._list.addItem(item)
+
+        if migrated:
+            write_history(self._history)
 
         if self._list.count() == 0:
             empty = QListWidgetItem("No history yet. Play a stream to start.")
@@ -281,6 +365,10 @@ class HistoryPanel(QWidget):
             font.setItalic(True)
             empty.setFont(font)
             self._list.addItem(empty)
+
+    def _refresh_expiry_badges(self) -> None:
+        if self.isVisible() and self._list.count():
+            self._list.viewport().update()
 
     def _on_item_clicked(self, item: QListWidgetItem) -> None:
         entry = item.data(Qt.UserRole + 5)
